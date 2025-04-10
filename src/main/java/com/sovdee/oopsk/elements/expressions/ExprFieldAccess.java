@@ -21,6 +21,7 @@ import org.skriptlang.skript.log.runtime.SyntaxRuntimeErrorProducer;
 import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -37,9 +38,9 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
 
     static {
         Skript.registerExpression(ExprFieldAccess.class, Object.class, ExpressionType.PROPERTY,
-                "[the] field <\\w+> [of] %struct%",
-                "%struct%'[s] <\\w+> field",
-                "%struct%[ ]->[ ]<\\w+>");
+                "[the] field <[\\w ]+> [of] %struct%",
+                "%struct%'[s] <[\\w ]+> field",
+                "%struct%[ ]->[ ]<[\\w ]+>");
     }
 
     String fieldName;
@@ -57,6 +58,11 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
         setExpr((Expression<Struct>) expressions[0]);
         node = getParser().getNode();
         fieldName = parseResult.regexes.get(0).group(0);
+        if (fieldName == null) {
+            Skript.error("Field name cannot be null.");
+            return false;
+        }
+        fieldName = fieldName.trim().toLowerCase(Locale.ENGLISH);
         if (!updateFieldGuesses()) {
             Skript.error("No field with name '" + fieldName + "' found.");
             return false;

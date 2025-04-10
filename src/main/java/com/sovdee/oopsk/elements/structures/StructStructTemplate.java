@@ -24,6 +24,7 @@ import org.skriptlang.skript.lang.structure.Structure;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -41,7 +42,7 @@ public class StructStructTemplate extends Structure {
     @Override
     public boolean init(Literal<?>[] args, int matchedPattern, SkriptParser.ParseResult parseResult, @Nullable EntryContainer entryContainer) {
         MatchResult regex = parseResult.regexes.get(0);
-        name = regex.group(1);
+        name = regex.group(1).trim().toLowerCase(Locale.ENGLISH);
         this.entryContainer = entryContainer;
 
         return entryContainer != null;
@@ -67,7 +68,7 @@ public class StructStructTemplate extends Structure {
     }
 
 
-    private static final Pattern fieldPattern = Pattern.compile("(\\w+): ([\\w ]+?)(?: ?= ?(.+))?");
+    private static final Pattern fieldPattern = Pattern.compile("([\\w ]+): ([\\w ]+?)(?: ?= ?(.+))?");
 
     private List<Field<?>> getFields(@NotNull SectionNode node) {
         List<Field<?>> fields = new ArrayList<>();
@@ -80,8 +81,19 @@ public class StructStructTemplate extends Structure {
                     Skript.error("invalid field: " + key);
                     return null;
                 }
+                // parse the field name
+                String fieldName = matcher.group(1).trim().toLowerCase(Locale.ENGLISH);
+                if (fieldName.isEmpty()) {
+                    Skript.error("Field name cannot be empty.");
+                    return null;
+                }
+                // check if the field name is already taken
+                if (fields.stream().anyMatch(field -> field.name().equalsIgnoreCase(fieldName))) {
+                    Skript.error("Field name '" + fieldName + "' is already taken.");
+                    return null;
+                }
+
                 // parse the field type
-                String fieldName = matcher.group(1);
                 var pair = Utils.getEnglishPlural(matcher.group(2).trim());
                 boolean isPlural = pair.getValue();
                 ClassInfo<?> fieldType = Classes.getClassInfoFromUserInput(pair.getKey());

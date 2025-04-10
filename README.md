@@ -34,6 +34,8 @@ Note that this means default values need to be re-evaluated and therefore will n
 Removing a template will 'orphan' existing structs, who will function as if the template still existed, though it may be impossible to access their information as the field access expression may not recognize the field names. If a new template is added with the same name, these existing structs will be updated to match the new template.
 If you remove a template, you should take care to remove structs that depended on it.
 
+**I recommend putting your templates in a separate script file, so you can limit the chances of them being accidentally modified or disabled.**
+
 ## Roadmap
 Alpha 2:
 - `constant` modifier for fields

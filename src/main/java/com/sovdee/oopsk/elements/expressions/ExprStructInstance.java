@@ -14,11 +14,13 @@ import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 import org.skriptlang.skript.log.runtime.SyntaxRuntimeErrorProducer;
 
+import java.util.Locale;
+
 public class ExprStructInstance extends SimpleExpression<Struct> implements SyntaxRuntimeErrorProducer {
 
     static {
         Skript.registerExpression(ExprStructInstance.class, Struct.class, ExpressionType.SIMPLE,
-                "[a[n]] <(\\w+)> struct [instance]");
+                "[a[n]] <([\\w ]+)> struct [instance]");
     }
 
     private String name;
@@ -29,6 +31,7 @@ public class ExprStructInstance extends SimpleExpression<Struct> implements Synt
         name = parseResult.regexes.get(0).group(1);
         if (name == null)
             return false;
+        name = name.trim().toLowerCase(Locale.ENGLISH);
         if (Oopsk.getTemplateManager().getTemplate(name) == null) {
             Skript.error("A struct by the name of '" + name + "' does not exist.");
             return false;
