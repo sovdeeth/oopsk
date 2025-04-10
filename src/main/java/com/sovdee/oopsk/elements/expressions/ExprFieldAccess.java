@@ -3,6 +3,10 @@ package com.sovdee.oopsk.elements.expressions;
 import ch.njol.skript.Skript;
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.config.Node;
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Example;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.expressions.base.PropertyExpression;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.ExpressionType;
@@ -20,21 +24,18 @@ import org.skriptlang.skript.log.runtime.SyntaxRuntimeErrorProducer;
 
 import java.lang.reflect.Array;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 
+@Name("Struct Field Access")
+@Description("Access a field of a struct. The field name is case insensitive. Non-constant fields can be set, reset, or deleted.")
+@Example("set the field name of {_struct} to \"test\"")
+@Example("set {_struct}'s name field to \"test\"")
+@Example("reset {_struct}->name")
+@Since("1.0")
 public class ExprFieldAccess extends PropertyExpression<Struct, Object> implements SyntaxRuntimeErrorProducer {
-
-    public static Set<ExprFieldAccess> activeInstances = Collections.newSetFromMap(new WeakHashMap<>());
-
-    public static void updateAll() {
-        for (ExprFieldAccess instance : activeInstances) {
-            instance.updateFieldGuesses();
-        }
-    }
 
     static {
         Skript.registerExpression(ExprFieldAccess.class, Object.class, ExpressionType.PROPERTY,
@@ -51,6 +52,7 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
     Class<?> returnType;
     boolean isAnyFieldSingle;
     boolean isAnyFieldPlural;
+    boolean areAllFieldsConstant;
 
     @Override
     public boolean init(Expression<?>[] expressions, int matchedPattern, Kleenean isDelayed, ParseResult parseResult) {
@@ -67,16 +69,28 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
             Skript.error("No field with name '" + fieldName + "' found.");
             return false;
         }
-        activeInstances.add(this);
         return true;
     }
 
+    /**
+     * Update the return type / isSingle guesses based on existing fields.
+     * @return True if a field was found, false otherwise.
+     */
     private boolean updateFieldGuesses() {
         // get all possible fields that this could be accessing
-        possibleFields = Oopsk.getTemplateManager()
+        var fieldSetMap = Oopsk.getTemplateManager()
                 .getFieldsMatching((field -> field.name().equalsIgnoreCase(fieldName)));
-        if (possibleFields.isEmpty()) {
+        if (fieldSetMap.isEmpty()) {
             return false;
+        }
+        // collapse setMap to a 1:1 map of template -> field
+        // since our predicate is based on name, there should never be a template with multiple fields that match.
+        possibleFields = new WeakHashMap<>();
+        for (Map.Entry<StructTemplate, Set<Field<?>>> entry : fieldSetMap.entrySet()) {
+            StructTemplate template = entry.getKey();
+            Set<Field<?>> fields = entry.getValue();
+            // if there are multiple fields, pick the first one
+            possibleFields.put(template, fields.stream().findFirst().orElse(null));
         }
         // use super type of all possible fields
         returnTypes = possibleFields.values().stream()
@@ -84,13 +98,17 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
                 .distinct()
                 .toArray(Class<?>[]::new);
         returnType = Classes.getSuperClassInfo(returnTypes).getC();
-        // for isSingle, default to true unless all fields are plural
+        // plurality/constant checks
+        areAllFieldsConstant = false;
+        isAnyFieldSingle = false;
+        isAnyFieldPlural = false;
         for (Field<?> field : possibleFields.values()) {
             if (field.single()) {
                 isAnyFieldSingle = true;
             } else {
                 isAnyFieldPlural = true;
             }
+            areAllFieldsConstant |= field.constant();
         }
         return true;
     }
@@ -108,12 +126,33 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
             error("Field " + fieldName + " not found in struct " + template.getName());
             return null;
         }
+        var value = struct.getFieldValue(field);
+        // check type is accurate to what we claimed
+        Class<?> type = value.getClass().getComponentType();
+        if (Arrays.stream(returnTypes).noneMatch(returnType -> returnType.isAssignableFrom(type))) {
+            //noinspection unchecked,rawtypes
+            var converted = Converters.convert(value, (Class[]) returnTypes, returnType);
+            if (converted != null) {
+                // if the field is not valid, but the value is convertible, return the converted value
+                return converted;
+            }
+            // if the field is not valid, and the value is not convertible, error
+            error("The " + field + " of " + struct + " is not the same type it claimed to be at parse time. " +
+                    "This likely was caused by template changes. Consider reloading this script.");
+            return null;
+        }
         // get the value
-        return struct.getFieldValue(field);
+        return value;
     }
 
     @Override
     public Class<?> @Nullable [] acceptChange(ChangeMode mode) {
+        // if the field is constant, we cannot change it
+        if (areAllFieldsConstant) {
+            Skript.error("Cannot change a constant field.");
+            return null;
+        }
+
         // reset and delete are always possible
         if (mode == ChangeMode.RESET || mode == ChangeMode.DELETE) {
             return new Class<?>[0];
@@ -140,6 +179,10 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
         Field<?> field = template.getField(fieldName);
         if (field == null) {
             error("Field " + fieldName + " not found in struct " + template.getName());
+            return;
+        }
+        if (field.constant()) {
+            error("Field " + fieldName + " of " + struct + " is constant and cannot be changed.");
             return;
         }
 

@@ -1,36 +1,98 @@
 package com.sovdee.oopsk.core;
 
+import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.util.ContextlessEvent;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.skriptlang.skript.lang.converter.Converters;
 
 import java.lang.reflect.Array;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * A struct is an instance of a struct template.
+ * It contains a reference to the template and a map of field values.
+ */
 public class Struct {
     private StructTemplate template;
     private final Map<Field<?>, Object[]> fieldValues;
 
-    public Struct(@NotNull StructTemplate template, @Nullable Event event) {
+    /**
+     * Creates a new struct with the given template and event.
+     *
+     * @param template The template to create the struct from.
+     * @param event    The event to evaluate the default values in.
+     * @see StructManager#createStruct(StructTemplate, Event)
+     */
+    Struct(@NotNull StructTemplate template, @Nullable Event event) {
         this.template = template;
         fieldValues = new HashMap<>();
-        for (Field<?> field : template.getFields().values()) {
+        for (Field<?> field : template.getFields()) {
             fieldValues.put(field, field.defaultValue(event));
         }
     }
 
+    /**
+     * Creates a new struct with the given template and event. Allows a map of initial values to be set in the struct.
+     *
+     * @param template The template to create the struct from.
+     * @param event    The event to evaluate the default values in.
+     * @param initialValues The initial values to set in the struct. This is a map of field names to expressions.
+     * @see StructManager#createStruct(StructTemplate, Event)
+     */
+    Struct(@NotNull StructTemplate template, @Nullable Event event, @Nullable Map<String, Expression<?>> initialValues) {
+        this.template = template;
+        fieldValues = new HashMap<>();
+        for (Field<?> field : template.getFields()) {
+            // check if the field has an initial value
+            if (initialValues != null && initialValues.containsKey(field.name())) {
+                Expression<?> expr = initialValues.get(field.name());
+                if (expr != null) {
+                    // evaluate the expression, ensure the types match, convert if not, and set the field value
+                    Object[] value = expr.getArray(event);
+                    if (value != null) {
+                        Class<?> type = value.getClass().getComponentType();
+                        if (!field.type().getC().isAssignableFrom(type)) {
+                            // convert the value to the correct type if possible
+                            value = Converters.convert(value, field.type().getC());
+                        }
+                    }
+                    // replace null values with empty arrays
+                    if (value == null)
+                        value = (Object[]) Array.newInstance(field.type().getC(), 0);
+                    fieldValues.put(field, value);
+                    continue;
+                }
+            }
+            fieldValues.put(field, field.defaultValue(event));
+        }
+    }
+
+    /**
+     * @return The template this struct is based on.
+     */
     public StructTemplate getTemplate() {
         return template;
     }
 
+    /**
+     * Gets the value of a field in this struct.
+     * @param field The field to get the value of.
+     * @return The value of the field, or null if the field does not exist in this struct.
+     */
     public Object[] getFieldValue(Field<?> field) {
         return fieldValues.get(field);
     }
 
-    public void setFieldValue(@NotNull Field<?> field, Object[] value) {
+    /**
+     * Sets the value of a field in this struct.
+     * @param field The field to set the value of.
+     * @param value The value to set the field to. Null values are replaced with an empty array.
+     */
+    public void setFieldValue(@NotNull Field<?> field, Object @Nullable [] value) {
         if (value == null)
             value = (Object[]) Array.newInstance(field.type().getC(), 0);
         if (template.hasField(field.name())) {
@@ -38,18 +100,28 @@ public class Struct {
         }
     }
 
+    /**
+     * Resets the value of a field in this struct to its default value.
+     * @param field The field to reset the value of.
+     * @param event The event to evaluate the default value in.
+     */
     public void resetFieldValue(@NotNull Field<?> field, @Nullable Event event) {
         if (template.hasField(field.name())) {
             fieldValues.put(field, field.defaultValue(event));
         }
     }
 
-    public boolean updateFromTemplate(StructTemplate newTemplate) {
+    /**
+     * Updates the fields of this struct to match the given template.
+     * @param newTemplate the new template to update to
+     * @return whether the struct was modified in a destructive manner
+     */
+    public boolean updateFromTemplate(@NotNull StructTemplate newTemplate) {
         // remove fields that are not in the new template
         boolean modified = fieldValues.keySet().removeIf(field -> !newTemplate.hasField(field.name()));
 
         // add new fields from the new template, modify existing fields if necessary
-        for (Field<?> newField : newTemplate.getFields().values()) {
+        for (Field<?> newField : newTemplate.getFields()) {
             String name = newField.name();
             // check for existing field to modify
             if (this.template.hasField(name)) {

@@ -5,6 +5,10 @@ import ch.njol.skript.classes.ClassInfo;
 import ch.njol.skript.config.Node;
 import ch.njol.skript.config.SectionNode;
 import ch.njol.skript.config.SimpleNode;
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Example;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.Literal;
 import ch.njol.skript.lang.ParseContext;
@@ -29,6 +33,23 @@ import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@Name("Struct Template")
+@Description({
+        "Creates a struct template. The template name is case insensitive and has the same restrictions as function names.",
+        "Fields are defined in the format '[const[ant]] <fieldname>: <fieldtype> [= %object%]'. Their names are case insensitive and consist of letters, underscores, and spaces. " +
+        "No two fields in the same template can have the same name.",
+        "The field type can be a single type or a plural type. The default value can be set by adding an optional '= value' at the end of the line." +
+        "The default value will be evaluated when the struct is created.",
+        "Fields can be marked as constant by adding 'const' or 'constant' at the beginning of the line. Constant fields cannot be changed after the struct is created.",
+})
+@Example("""
+    struct message:
+        sender: player
+        message: string
+        const timestamp: date = now
+        attachments: objects
+    """)
+@Since("1.0")
 public class StructStructTemplate extends Structure {
 
     static {
@@ -68,7 +89,7 @@ public class StructStructTemplate extends Structure {
     }
 
 
-    private static final Pattern fieldPattern = Pattern.compile("([\\w ]+): ([\\w ]+?)(?: ?= ?(.+))?");
+    private static final Pattern fieldPattern = Pattern.compile("(const(?:ant)? )?([\\w ]+): ([\\w ]+?)(?: ?= ?(.+))?");
 
     private List<Field<?>> getFields(@NotNull SectionNode node) {
         List<Field<?>> fields = new ArrayList<>();
@@ -81,8 +102,9 @@ public class StructStructTemplate extends Structure {
                     Skript.error("invalid field: " + key);
                     return null;
                 }
+                boolean constant = matcher.group(1) != null;
                 // parse the field name
-                String fieldName = matcher.group(1).trim().toLowerCase(Locale.ENGLISH);
+                String fieldName = matcher.group(2).trim().toLowerCase(Locale.ENGLISH);
                 if (fieldName.isEmpty()) {
                     Skript.error("Field name cannot be empty.");
                     return null;
@@ -94,25 +116,25 @@ public class StructStructTemplate extends Structure {
                 }
 
                 // parse the field type
-                var pair = Utils.getEnglishPlural(matcher.group(2).trim());
+                var pair = Utils.getEnglishPlural(matcher.group(3).trim());
                 boolean isPlural = pair.getValue();
                 ClassInfo<?> fieldType = Classes.getClassInfoFromUserInput(pair.getKey());
                 if (fieldType == null) {
-                    Skript.error("invalid field type: " + matcher.group(2).trim());
+                    Skript.error("invalid field type: " + matcher.group(3).trim());
                     return null;
                 }
                 // parse the default value
                 Expression<?> defaultValue = null;
-                if (matcher.group(3) != null) {
+                if (matcher.group(4) != null) {
                     //noinspection unchecked
                     defaultValue = new SkriptParser(matcher.group(3), SkriptParser.ALL_FLAGS, ParseContext.DEFAULT).parseExpression(fieldType.getC());
                     if (defaultValue == null || LiteralUtils.hasUnparsedLiteral(defaultValue)) {
-                        Skript.error("Invalid default value for the given type: '" + matcher.group(3) + "'");
+                        Skript.error("Invalid default value for the given type: '" + matcher.group(4) + "'");
                         return null;
                     }
                 }
                 //noinspection rawtypes,unchecked
-                fields.add(new Field<>(fieldName, (ClassInfo) fieldType, !isPlural, defaultValue));
+                fields.add(new Field<>(fieldName, (ClassInfo) fieldType, !isPlural, constant, defaultValue));
             }
         }
         return fields;
