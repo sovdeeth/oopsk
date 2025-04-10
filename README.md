@@ -8,10 +8,11 @@ The current feature set revolves around `structs`, simple objects that group tog
 struct Message:
   contents: string
   sender: offline player
-  timestamp: date = now
+  const timestamp: date = now
 ```
 A template's name and field names are case-insensitive. The template name follows the same rules as a function name, while field names can only consist of letters, underscores, and spaces. 
 Each field has a name and a type, as well as an optional default value. This default value may be an expression, as it is evaluated when a struct is created, not when the template is registered.
+Adding `const` or `constant` to the start will prevent the field from being changed after creation.
 
 Creating a struct involves a simple expression:
 ```
@@ -23,6 +24,13 @@ set field contents of {_a} to "hello world"
 broadcast {_a}'s sender field
 reset {_a}->timestamp
 ```
+Structs can also be created with initial values:
+```
+set {_a} to a message struct:
+  sender: player
+  contents: "hello world"
+```
+
 ### Type Safety
 oopsk attempts to ensure type safety at parse time via checking all fields with the given name. This means having unique field names across structs allows oopsk to give you more accurate parse errors, while sharing field names can result in invalid code not causing any errors during parsing. 
 Any type violations not caught during parsing should be caught at runtime via runtime errors that cannot be suppressed. Note that code parsed in one script prior to updates to a struct in another script will not show parse errors until it is reloaded again, though it should properly emit runtime errors.
@@ -52,29 +60,6 @@ Possibilities:
 - Allowing fields to accept structs from specific templates, rather than any struct.
 
 ## Docs
-### Struct Template
-```
-struct <name>:
-  <field name>: <field type>
-  <field name>: <field type> = <default value>
-```
-Registers a new template with the given name and fields. Both template names and field names are case-insensitive.
-- <name>: The template's name. Follows the restrictions of a function name.
-- <field name>: The name of a field. Consists of letters, underscores, and spaces.
-- <field type>: A Skript type that determines the type of the field. Can be plural for a list of values.
-- <default value>: Optional. An expression that will be evaluated when a struct is created from this template.
 
-### Create a Struct
-```
-[a[n]] <template name> struct [instance]
-```
-Creates a struct instance from the provided template. Default values are evaluated and assigned. 
-
-### Access a Field
-```
-[the] field <field name> [of] %struct%
-%struct%'[s] <field name> field
-%struct%[ ]->[ ]<field name>
-```
-Gets the field of a given struct. Fields can be set, deleted, or reset to their default values (this re-evaluates the default value expression).
+Docs are available on [skUnity](https://docs.skunity.com/syntax/search/addon:oopsk) or on SkriptHub (coming soon).
 
