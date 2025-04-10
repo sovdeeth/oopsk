@@ -45,13 +45,8 @@ If you remove a template, you should take care to remove structs that depended o
 **I recommend putting your templates in a separate script file, so you can limit the chances of them being accidentally modified or disabled.**
 
 ## Roadmap
-Alpha 2:
-- `constant` modifier for fields
-- condition to test what template a struct was created from
-- Expression Section for creating structs
-
 Beta:
-- Expression to get all field names of a struct
+- Reflective expressions for structs and field (get fields, get types, get whether a field is constant...)
 - Expression to dynamically access a field from a string (unsafe)
 - Serialization of structs (unsure on feasibility)
 
