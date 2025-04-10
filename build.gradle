@@ -1,9 +1,10 @@
+import org.apache.tools.ant.filters.ReplaceTokens
+
 plugins {
     id 'java'
 }
 
 group = 'com.sovdee'
-version = '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
@@ -16,16 +17,15 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'org.spigotmc:spigot-api:1.21.1-R0.1-SNAPSHOT'
-    compileOnly "com.github.SkriptLang:Skript:2.9.0"
+    compileOnly 'org.spigotmc:spigot-api:1.21.4-R0.1-SNAPSHOT'
+    compileOnly "com.github.SkriptLang:Skript:2.10.2"
     compileOnly 'org.jetbrains:annotations:26.0.1'
 }
 
 processResources {
-    def props = [version: version]
-    inputs.properties props
-    filteringCharset 'UTF-8'
-    filesMatching('plugin.yml') {
-        expand props
+    filter ReplaceTokens, tokens: ["version": project.property("version")]
+    from("lang/") {
+        include '*.lang'
+        into 'lang/'
     }
 }

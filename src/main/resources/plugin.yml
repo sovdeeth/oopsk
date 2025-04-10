@@ -2,7 +2,7 @@ name: oopsk
 author: Sovde
 website: https://github.com/sovdeeth/oopsk
 description: Limited OOP in Skript
-version: '${version}'
+version: @version@
 depend: [Skript]
 main: com.sovdee.oopsk.Oopsk
 api-version: '1.13'
