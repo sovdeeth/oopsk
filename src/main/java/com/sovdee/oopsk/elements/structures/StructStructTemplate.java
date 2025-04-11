@@ -72,6 +72,12 @@ public class StructStructTemplate extends Structure {
     @Override
     public boolean preLoad() {
         SectionNode node = entryContainer.getSource();
+
+        if (node.isEmpty()) {
+            Skript.error("Struct templates must have at least one field.");
+            return false;
+        }
+
         List<Field<?>> fields = getFields(node);
 
         if (fields == null)
