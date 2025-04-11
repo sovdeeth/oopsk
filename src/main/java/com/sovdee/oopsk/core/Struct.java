@@ -83,8 +83,9 @@ public class Struct {
      * @param field The field to get the value of.
      * @return The value of the field, or null if the field does not exist in this struct.
      */
-    public Object[] getFieldValue(Field<?> field) {
-        return fieldValues.get(field);
+    public <T> T[] getFieldValue(Field<T> field) {
+        //noinspection unchecked
+        return (T[]) fieldValues.get(field);
     }
 
     /**
@@ -92,13 +93,29 @@ public class Struct {
      * @param field The field to set the value of.
      * @param value The value to set the field to. Null values are replaced with an empty array.
      */
-    public void setFieldValue(@NotNull Field<?> field, Object @Nullable [] value) {
-        if (value == null)
-            value = (Object[]) Array.newInstance(field.type().getC(), 0);
+    public <T> void setFieldValue(@NotNull Field<T> field, T @Nullable [] value) {
         if (template.hasField(field.name())) {
+            if (value == null)
+                //noinspection unchecked
+                value = (T[]) Array.newInstance(field.type().getC(), 0);
             fieldValues.put(field, value);
         }
     }
+
+    /**
+     * Sets the value of a field in this struct.
+     * @param field The field to set the value of.
+     * @param value The value to set the field to. Null values are replaced with an empty array.
+     */
+    public <T> void setSingleFieldValue(@NotNull Field<T> field, @Nullable T value) {
+        if (template.hasField(field.name())) {
+            Object[] valueArray = (Object[]) Array.newInstance(field.type().getC(), value == null ? 0 : 1);
+            if (value != null)
+                valueArray[0] = value;
+            fieldValues.put(field, valueArray);
+        }
+    }
+
 
     /**
      * Resets the value of a field in this struct to its default value.
