@@ -1,7 +1,9 @@
 package com.sovdee.oopsk.elements.expressions;
 
 import ch.njol.skript.Skript;
+import ch.njol.skript.classes.Changer;
 import ch.njol.skript.classes.Changer.ChangeMode;
+import ch.njol.skript.classes.ClassInfo;
 import ch.njol.skript.config.Node;
 import ch.njol.skript.doc.Description;
 import ch.njol.skript.doc.Example;
@@ -12,22 +14,28 @@ import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.ExpressionType;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.registrations.Classes;
+import ch.njol.skript.util.Utils;
 import ch.njol.util.Kleenean;
 import com.sovdee.oopsk.Oopsk;
 import com.sovdee.oopsk.core.Field;
 import com.sovdee.oopsk.core.Struct;
 import com.sovdee.oopsk.core.StructTemplate;
 import org.bukkit.event.Event;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.skriptlang.skript.lang.arithmetic.Arithmetics;
+import org.skriptlang.skript.lang.arithmetic.OperationInfo;
+import org.skriptlang.skript.lang.arithmetic.Operator;
 import org.skriptlang.skript.lang.converter.Converters;
 import org.skriptlang.skript.log.runtime.SyntaxRuntimeErrorProducer;
 
-import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.WeakHashMap;
+import java.util.stream.Collectors;
 
 @Name("Struct Field Access")
 @Description("Access a field of a struct. The field name is case insensitive. Non-constant fields can be set, reset, or deleted.")
@@ -158,12 +166,43 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
             return new Class<?>[0];
         }
 
-        if (mode == ChangeMode.SET) {
+        // if a field is a list, allow add/remove/removeall/set
+        if (isAnyFieldPlural && (mode == ChangeMode.ADD || mode == ChangeMode.REMOVE || mode == ChangeMode.REMOVE_ALL || mode == ChangeMode.SET))
             // return all return types
-            if (isAnyFieldPlural)
-                // if any field is plural, return array types
-                return Arrays.stream(returnTypes).map(Class::arrayType).toArray(Class<?>[]::new);
+            return Arrays.stream(returnTypes).map(Class::arrayType).toArray(Class<?>[]::new);
+
+        // if the mode is set, always allow changes
+        if (mode == ChangeMode.SET)
+            // return all return types
             return returnTypes;
+
+        // if we have a single field, we can delegate to that type's changer, so get all the classes from the changers
+        if (isAnyFieldSingle) {
+            Set<Class<?>> distinctClasses = Arrays.stream(returnTypes)
+                    .map(Classes::getSuperClassInfo)
+                    .filter(Objects::nonNull)
+                    .map(ClassInfo::getChanger)
+                    .filter(Objects::nonNull)
+                    .flatMap(changer -> {
+                        Class<?>[] classes = changer.acceptChange(mode);
+                        if (classes == null) return null;
+                        return Arrays.stream(classes);
+                    })
+                    .collect(Collectors.toSet());
+            // check arithmetic operations as well
+            Operator operator = mode == ChangeMode.ADD ? Operator.ADDITION : Operator.SUBTRACTION;
+            distinctClasses.addAll(Arrays.stream(returnTypes)
+                    .map(Classes::getSuperClassInfo)
+                    .filter(Objects::nonNull)
+                    .flatMap(classInfo -> Arithmetics.getOperations(operator, classInfo.getC()).stream())
+                    .filter(operationInfo ->
+                            Arrays.stream(returnTypes).anyMatch((type) ->
+                                    type.isAssignableFrom(operationInfo.getReturnType())))
+                    .map(OperationInfo::getLeft)
+                    .collect(Collectors.toSet()));
+            // return all classes
+            return distinctClasses.toArray(new Class<?>[0]);
+
         }
         return null;
     }
@@ -177,6 +216,7 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
         StructTemplate template = struct.getTemplate();
         // get the field
         Field<?> field = template.getField(fieldName);
+
         if (field == null) {
             error("Field " + fieldName + " not found in struct " + template.getName());
             return;
@@ -191,45 +231,119 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
                     struct.resetFieldValue(field, event);
             case DELETE -> // delete the field value
                     struct.setFieldValue(field, null);
-            case SET -> { // set the field value
+            case SET -> {
                 if (delta == null || delta.length == 0) return;
-                Class<?> fieldClass = field.type().getC();
-                // check if the value is an array
-                if (field.single()) {
-                    // if delta is an array, error
-                    if (delta.length > 1) {
-                        error("Cannot set " + field + " of " + struct + " to multiple things. It is a single field.");
-                        return;
-                    }
-
-                    // ensure the value is of the correct type
-                    delta[0] = Converters.convert(delta[0], fieldClass);
-                    if (delta[0] == null) {
-                        // if it is not convertible, error
-                        error("Cannot set " + field + " of " + struct + " to the given value. It is not " +
-                                field.type().getName().withIndefiniteArticle() + ".");
-                        return;
-                    }
-                    Object[] typedDelta = (Object[]) Array.newInstance(fieldClass, 1);
-                    typedDelta[0] = delta[0];
-                    struct.setFieldValue(field, typedDelta);
-                } else {
-                    // attempt to convert all values to the correct type
-                    Object[] convertedDelta = Converters.convert(delta, fieldClass);
-                    if (convertedDelta.length == 0) {
-                        // if none of the values are convertible, error
-                        var name = field.type().getName();
-                        error("Cannot set " + field + " of " + struct + " to the given value[s]. They are not " + name.toString(true) + ".");
-                        return;
-                    } else if (convertedDelta.length != delta.length) {
-                        // if not all values are of the correct type, warn
-                        warning("Not all values are of the correct type for " + field + " of " + struct + ". " +
-                                (delta.length - convertedDelta.length) + " value[s] were ignored.");
-                    }
-                    struct.setFieldValue(field, convertedDelta);
-                }
+                // set the field value
+                setField(struct, field, delta);
+            }
+            case ADD, REMOVE, REMOVE_ALL -> {
+                if (delta == null || delta.length == 0) return;
+                // if single, delegate to the changer.
+                if (field.single())
+                    delegateChange(struct, field, mode, delta, event);
+//                else // if plural, modify the array directly
+//                    modifyListField(struct, field, delta, mode);
             }
         }
+
+    }
+
+    /**
+     * Sets the field value of a struct.
+     * @param struct The struct to set the field value of.
+     * @param field The field to set the value of.
+     * @param delta The value to set the field to. If the field is a list, this can be an array of values.
+     * @param <T> The type of the field.
+     */
+    public <T> void setField(Struct struct, @NotNull Field<T> field, Object[] delta) {
+        Class<T> fieldClass = field.type().getC();
+
+        // attempt to convert all values to the correct type
+        T[] convertedDelta = Converters.convert(delta, fieldClass);
+        if (convertedDelta.length == 0) {
+            // if none of the values are convertible, error
+            var name = field.type().getName();
+            if (field.single())
+                error("Cannot set " + field + " of " + struct + " to the given value. It is not " + name.withIndefiniteArticle() + ".");
+            else
+                error("Cannot set " + field + " of " + struct + " to the given value[s]. They are not " + name.toString(true) + ".");
+            return;
+        } else if (convertedDelta.length != delta.length) {
+            // if not all values are of the correct type, warn
+            warning("Not all values are of the correct type for " + field + " of " + struct + ". " +
+                    (delta.length - convertedDelta.length) + " value[s] were ignored.");
+        }
+
+        // check if the value is an array
+        if (field.single() && delta.length > 1) {
+            error("Cannot set " + field + " of " + struct + " to multiple things. It is a single field.");
+            return;
+        }
+        struct.setFieldValue(field, convertedDelta);
+    }
+
+    /**
+     * Delegate the change to arithmetic or the value's changer if it has one.
+     * The field must be single.
+     * Code modified from Skript's Variable class change() method.
+     */
+    @SuppressWarnings("unchecked")
+    public <T> void delegateChange(Struct struct, Field<T> field, ChangeMode mode, Object[] delta, Event event) {
+        // get the field value
+        T[] arrayValue = struct.getFieldValue(field);
+        // unwrap the array value
+        T fieldValue = null;
+        if (arrayValue != null && arrayValue.length > 0)
+            fieldValue = arrayValue[0];
+
+        // setup useful variables
+        Class<? extends T> fieldClass = fieldValue == null ? null : (Class<? extends T>) fieldValue.getClass();
+        Operator operator = mode == ChangeMode.ADD ? Operator.ADDITION : Operator.SUBTRACTION;
+        Changer<?> changer;
+        Class<?>[] classes;
+
+        // attempt arithmetic first
+        if (fieldClass == null || !Arithmetics.getOperations(operator, fieldClass).isEmpty()) {
+            boolean changed = false;
+            // for each delta value, look for an operation that returns the field type and apply it
+            for (Object newValue : delta) {
+                //noinspection rawtypes
+                OperationInfo info = Arithmetics.getOperationInfo(operator, fieldClass != null ? (Class) fieldClass : newValue.getClass(), newValue.getClass());
+                if (info == null || !field.type().getC().isAssignableFrom(info.getReturnType()))
+                    continue; // no operation or wrong return type
+
+                Object value = fieldValue == null ? Arithmetics.getDefaultValue(info.getLeft()) : fieldValue;
+                if (value == null)
+                    continue;
+
+                fieldValue = (T) info.getOperation().calculate(value, newValue);
+                changed = true;
+            }
+            if (changed) {
+                struct.setSingleFieldValue(field, fieldValue);
+            } else {
+                error("Could not perform " + operator.getName() + " with " + field + " of " + struct + " and the given values (" + Utils.join(delta) + ").");
+            }
+            return;
+        // if no arithmetic exists, try delegating to the changer.
+        } else if ((changer = Classes.getSuperClassInfo(fieldClass).getChanger()) != null && (classes = changer.acceptChange(mode)) != null) {
+            Class<?>[] componentClasses = new Class<?>[classes.length];
+            for (int i = 0; i < classes.length; i++)
+                componentClasses[i] = classes[i].isArray() ? classes[i].getComponentType() : classes[i];
+
+            //noinspection rawtypes
+            Object[] convertedDelta = Converters.convert(delta, (Class[]) componentClasses, Utils.getSuperType(componentClasses));
+
+            if (convertedDelta.length > 0) {
+                Changer.ChangerUtils.change(changer, arrayValue, convertedDelta, mode);
+                return;
+            }
+        }
+        // if we get here, we couldn't find a way to change the value
+        if (mode == ChangeMode.ADD)
+            error("Could not add the given values (" + Utils.join(delta) + ") to " + field + " of " + struct + ".");
+        else
+            error("Could not remove the given values (" + Utils.join(delta) + ") from " + field + " of " + struct + ".");
     }
 
     @Override
