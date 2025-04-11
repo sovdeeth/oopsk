@@ -89,7 +89,7 @@ public class StructStructTemplate extends Structure {
     }
 
 
-    private static final Pattern fieldPattern = Pattern.compile("(const(?:ant)? )?([\\w ]+): ([\\w ]+?)(?: ?= ?(.+))?");
+    private static final Pattern fieldPattern = Pattern.compile("(?<const>const(?:ant)? )?(?<name>[\\w ]+): (?<type>[\\w ]+?)(?: ?= ?(?<value>.+))?");
 
     private List<Field<?>> getFields(@NotNull SectionNode node) {
         List<Field<?>> fields = new ArrayList<>();
@@ -102,9 +102,9 @@ public class StructStructTemplate extends Structure {
                     Skript.error("invalid field: " + key);
                     return null;
                 }
-                boolean constant = matcher.group(1) != null;
+                boolean constant = matcher.group("const") != null;
                 // parse the field name
-                String fieldName = matcher.group(2).trim().toLowerCase(Locale.ENGLISH);
+                String fieldName = matcher.group("name").trim().toLowerCase(Locale.ENGLISH);
                 if (fieldName.isEmpty()) {
                     Skript.error("Field name cannot be empty.");
                     return null;
@@ -116,20 +116,20 @@ public class StructStructTemplate extends Structure {
                 }
 
                 // parse the field type
-                var pair = Utils.getEnglishPlural(matcher.group(3).trim());
+                var pair = Utils.getEnglishPlural(matcher.group("type").trim());
                 boolean isPlural = pair.getValue();
                 ClassInfo<?> fieldType = Classes.getClassInfoFromUserInput(pair.getKey());
                 if (fieldType == null) {
-                    Skript.error("invalid field type: " + matcher.group(3).trim());
+                    Skript.error("invalid field type: " + matcher.group("type").trim());
                     return null;
                 }
                 // parse the default value
                 Expression<?> defaultValue = null;
-                if (matcher.group(4) != null) {
+                if (matcher.group("value") != null) {
                     //noinspection unchecked
-                    defaultValue = new SkriptParser(matcher.group(3), SkriptParser.ALL_FLAGS, ParseContext.DEFAULT).parseExpression(fieldType.getC());
+                    defaultValue = new SkriptParser(matcher.group("value"), SkriptParser.ALL_FLAGS, ParseContext.DEFAULT).parseExpression(fieldType.getC());
                     if (defaultValue == null || LiteralUtils.hasUnparsedLiteral(defaultValue)) {
-                        Skript.error("Invalid default value for the given type: '" + matcher.group(4) + "'");
+                        Skript.error("Invalid default value for the given type: '" + matcher.group("value") + "'");
                         return null;
                     }
                 }
