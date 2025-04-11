@@ -26,10 +26,15 @@ import org.jetbrains.annotations.Nullable;
 import org.skriptlang.skript.lang.arithmetic.Arithmetics;
 import org.skriptlang.skript.lang.arithmetic.OperationInfo;
 import org.skriptlang.skript.lang.arithmetic.Operator;
+import org.skriptlang.skript.lang.comparator.Comparators;
+import org.skriptlang.skript.lang.comparator.Relation;
 import org.skriptlang.skript.lang.converter.Converters;
 import org.skriptlang.skript.log.runtime.SyntaxRuntimeErrorProducer;
 
+import java.lang.reflect.Array;
 import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -240,9 +245,9 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
                 if (delta == null || delta.length == 0) return;
                 // if single, delegate to the changer.
                 if (field.single())
-                    delegateChange(struct, field, mode, delta, event);
-//                else // if plural, modify the array directly
-//                    modifyListField(struct, field, delta, mode);
+                    delegateChange(struct, field, mode, delta);
+                else // if plural, modify the array directly
+                    modifyListField(struct, field, mode, delta);
             }
         }
 
@@ -286,9 +291,13 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
      * Delegate the change to arithmetic or the value's changer if it has one.
      * The field must be single.
      * Code modified from Skript's Variable class change() method.
+     * @param struct The struct to change the field of.
+     * @param field The field to change.
+     * @param mode The change mode, either {@link ChangeMode#ADD}, {@link ChangeMode#REMOVE}, or {@link ChangeMode#REMOVE_ALL}.
+     * @param delta The delta values to change the field by.
      */
     @SuppressWarnings("unchecked")
-    public <T> void delegateChange(Struct struct, Field<T> field, ChangeMode mode, Object[] delta, Event event) {
+    public <T> void delegateChange(@NotNull Struct struct, Field<T> field, ChangeMode mode, Object[] delta) {
         // get the field value
         T[] arrayValue = struct.getFieldValue(field);
         // unwrap the array value
@@ -345,6 +354,55 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
         else
             error("Could not remove the given values (" + Utils.join(delta) + ") from " + field + " of " + struct + ".");
     }
+
+    public <T> void modifyListField(@NotNull Struct struct, @NotNull Field<T> field, ChangeMode mode, Object[] delta) {
+        // get converted delta
+        T[] convertedDelta = Converters.convert(delta, field.type().getC());
+        if (convertedDelta.length == 0) {
+            // if none of the values are convertible, error
+            var name = field.type().getName();
+            error("Cannot " + (mode == ChangeMode.ADD ? "add" : "remove") +
+                    " the given values (" + Utils.join(convertedDelta) + ") " + (mode == ChangeMode.ADD ? "to " : "from ") +
+                    field + " of " + struct + ". They are not " + name.toString(true) + ".");
+            return;
+        } else if (convertedDelta.length != delta.length) {
+            // if not all values are of the correct type, warn
+            warning("Not all values are of the correct type for " + field + " of " + struct + ". " +
+                    (delta.length - convertedDelta.length) + " value[s] were ignored.");
+        }
+        // get the current field value
+        T[] fieldValue = struct.getFieldValue(field);
+        if (mode == ChangeMode.ADD) {
+            // add the values to the field
+            T[] newValue = Arrays.copyOf(fieldValue, fieldValue.length + convertedDelta.length);
+            System.arraycopy(convertedDelta, 0, newValue, fieldValue.length, convertedDelta.length);
+            struct.setFieldValue(field, newValue);
+
+        } else if (mode == ChangeMode.REMOVE || mode == ChangeMode.REMOVE_ALL) {
+            List<T> deltaList = Arrays.asList(convertedDelta);
+            List<T> valuesList = Arrays.asList(fieldValue);
+            for (Iterator<T> fieldIterator = valuesList.iterator(); fieldIterator.hasNext(); ) {
+                T value = fieldIterator.next();
+
+                for (Iterator<T> deltaIterator = deltaList.iterator(); deltaIterator.hasNext(); ) {
+                    T removeValue = deltaIterator.next();
+
+                    if (Relation.EQUAL.isImpliedBy(Comparators.compare(value, removeValue))) {
+                        fieldIterator.remove();
+                        if (mode == ChangeMode.REMOVE) {
+                            // if only removing first, remove this removeValue from delta to prevent it from matching another value
+                            deltaIterator.remove();
+                            break; // No need to check other values, only remove first
+                        }
+                    }
+                }
+            }
+            // set the field value to the new list
+            //noinspection unchecked
+            struct.setFieldValue(field, valuesList.toArray((T[]) Array.newInstance(field.type().getC(), 0)));
+        }
+    }
+
 
     @Override
     public Class<?> getReturnType() {
