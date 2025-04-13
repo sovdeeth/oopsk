@@ -56,5 +56,5 @@ Possibilities:
 
 ## Docs
 
-Docs are available on [skUnity](https://docs.skunity.com/syntax/search/addon:oopsk) or on SkriptHub (coming soon).
+Docs are available on [skUnity](https://docs.skunity.com/syntax/search/addon:oopsk) or on [SkriptHub](http://skripthub.net/docs/?addon=oopsk).
 
