@@ -162,7 +162,7 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
     public Class<?> @Nullable [] acceptChange(ChangeMode mode) {
         // if the field is constant, we cannot change it
         if (areAllFieldsConstant) {
-            Skript.error("Cannot change a constant field.");
+            Skript.error("Cannot change a constant or dynamic field.");
             return null;
         }
 
@@ -224,6 +224,12 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
 
         if (field == null) {
             error("Field " + fieldName + " not found in struct " + template.getName());
+            return;
+        }
+
+        // unchangeable field checks
+        if (field.dynamic()) {
+            error("Field " + fieldName + " of " + struct + " is dynamic and cannot be changed.");
             return;
         }
         if (field.constant()) {
