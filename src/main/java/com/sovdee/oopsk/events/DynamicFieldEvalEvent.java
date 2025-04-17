@@ -16,6 +16,9 @@ public class DynamicFieldEvalEvent extends Event {
         this.struct = struct;
     }
 
+    /**
+     * @return The struct that initiated this eval event.
+     */
     public Struct getStruct() {
         return struct;
     }

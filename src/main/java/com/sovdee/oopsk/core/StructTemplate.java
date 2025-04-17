@@ -36,9 +36,8 @@ public class StructTemplate {
         return name;
     }
 
-
     /**
-     * Parses all the default values for this struct. Prints errors.
+     * Parses all the default value expressions for this struct. Prints errors.
      * @return true if no errors were encountered. False otherwise.
      */
     public boolean parseFields() {

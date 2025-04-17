@@ -226,6 +226,12 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
             error("Field " + fieldName + " not found in struct " + template.getName());
             return;
         }
+
+        // unchangeable field checks
+        if (field.dynamic()) {
+            error("Field " + fieldName + " of " + struct + " is dynamic and cannot be changed.");
+            return;
+        }
         if (field.constant()) {
             error("Field " + fieldName + " of " + struct + " is constant and cannot be changed.");
             return;

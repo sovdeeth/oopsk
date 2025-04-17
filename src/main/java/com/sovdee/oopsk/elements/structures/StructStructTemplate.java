@@ -42,6 +42,8 @@ import java.util.regex.Pattern;
         "The field type can be a single type or a plural type. The default value can be set by adding an optional '= value' at the end of the line." +
         "The default value will be evaluated when the struct is created.",
         "Fields can be marked as constant by adding 'const' or 'constant' at the beginning of the line. Constant fields cannot be changed after the struct is created.",
+        "Dynamic fields can be made by adding 'dynamic' to the beginning of the line. Dynamic fields require a default value and will always re-evaluate their value each time they are called. " +
+        "This means they cannot be changed directly, but can rely on the values of other fields or even functions."
 })
 @Example("""
     struct message:
@@ -49,6 +51,12 @@ import java.util.regex.Pattern;
         message: string
         const timestamp: date = now
         attachments: objects
+    """)
+@Example("""
+    struct Vector2:
+        x: number
+        y: number
+        dynamic length: number = sqrt(this->x^2 + this->y^2)
     """)
 @Since("1.0")
 public class StructStructTemplate extends Structure {
@@ -96,8 +104,10 @@ public class StructStructTemplate extends Structure {
 
         // delayed parse so all fields are present
         getParser().setCurrentEvent("parse template", DynamicFieldEvalEvent.class);
-        if (!template.parseFields())
+        if (!template.parseFields()) {
+            templateManager.removeTemplate(template);
             return false;
+        }
         getParser().deleteCurrentEvent();
 
         return true;
@@ -118,6 +128,7 @@ public class StructStructTemplate extends Structure {
                     return null;
                 }
 
+                // get modifiers (TODO: better parsing than regex?)
                 Set<Modifier> modifiers = EnumSet.noneOf(Modifier.class);
 
                 if (matcher.group("const") != null)
@@ -129,6 +140,7 @@ public class StructStructTemplate extends Structure {
                     modifiers.add(Modifier.DYNAMIC);
                     modifiers.add(Modifier.CONSTANT);
                 }
+
                 // parse the field name
                 String fieldName = matcher.group("name").trim().toLowerCase(Locale.ENGLISH);
                 if (fieldName.isEmpty()) {
@@ -150,8 +162,14 @@ public class StructStructTemplate extends Structure {
                     return null;
                 }
 
+                String defaultValueString = matcher.group("value");
+                if (defaultValueString == null && modifiers.contains(Modifier.DYNAMIC)) {
+                    Skript.error("Dynamic fields require a default value to be given.");
+                    return null;
+                }
+
                 //noinspection rawtypes,unchecked
-                fields.add(new Field<>(fieldName, (ClassInfo) fieldType, !isPlural, matcher.group("value"), modifiers));
+                fields.add(new Field<>(fieldName, (ClassInfo) fieldType, !isPlural, defaultValueString, modifiers));
             }
         }
         return fields;

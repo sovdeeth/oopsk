@@ -1,6 +1,10 @@
 package com.sovdee.oopsk.elements.expressions;
 
 import ch.njol.skript.Skript;
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Example;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.ExpressionType;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -11,6 +15,15 @@ import com.sovdee.oopsk.events.DynamicFieldEvalEvent;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
+@Name("This Struct")
+@Description("Usable only in dynamic field expressions, this refers to whatever struct is evaluating this field.")
+@Example("""
+    struct Vector2:
+        x: number
+        y: number
+        dynamic length: number = sqrt(this->x^2 + this-y^2)
+    """)
+@Since("1.0")
 public class ExprThisStruct extends SimpleExpression<Struct> {
 
     static {

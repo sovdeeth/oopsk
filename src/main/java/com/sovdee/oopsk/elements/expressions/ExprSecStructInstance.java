@@ -100,18 +100,23 @@ public class ExprSecStructInstance extends SectionExpression<Struct> implements 
                     Skript.error("Invalid field node: " + entry);
                     return false;
                 }
+
                 String fieldName = matcher.group(1).trim().toLowerCase(Locale.ENGLISH);
                 String value = matcher.group(2).trim();
+
                 // check if field exists
                 Field<?> field = template.getField(fieldName);
                 if (field == null) {
                     Skript.error("Field '" + fieldName + "' does not exist in struct '" + name + "'.");
                     return false;
                 }
+
+                // dynamic fields can't be changed.
                 if (field.dynamic()) {
                     Skript.error("Cannot assign values to dynamic fields.");
                     return false;
                 }
+
                 // parse the value
                 //noinspection unchecked
                 Expression<?> expr = new SkriptParser(value, SkriptParser.ALL_FLAGS, ParseContext.DEFAULT).parseExpression(field.type().getC());

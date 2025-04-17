@@ -8,9 +8,11 @@ import ch.njol.skript.lang.SkriptParser;
 import ch.njol.skript.util.LiteralUtils;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 import java.lang.reflect.Array;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
@@ -27,14 +29,12 @@ public final class Field<T> {
         DYNAMIC
     }
 
-
     private final String name;
     private final ClassInfo<T> type;
     private final boolean single;
     private final @Nullable String defaultExpressionString;
     private Expression<? extends T> defaultExpression;
     private final Set<Modifier> modifiers;
-
 
     /**
      * Creates a new field with the given name, type, and default value.
@@ -70,14 +70,10 @@ public final class Field<T> {
         this.defaultExpressionString = defaultExpressionString;
     }
 
-    public boolean constant() {
-        return modifiers.contains(Modifier.CONSTANT) || modifiers.contains(Modifier.DYNAMIC);
-    }
-
-    public boolean dynamic() {
-        return modifiers.contains(Modifier.DYNAMIC);
-    }
-
+    /**
+     * Parses the default value string of this field into an expression. Prints errors.
+     * @return false if errors are encountered during parsing. True otherwise.
+     */
     public boolean parseDefaultValueExpression() {
         if (defaultExpression != null || defaultExpressionString == null)
             return true;
@@ -94,6 +90,20 @@ public final class Field<T> {
     }
 
     /**
+     * @return Whether this field is constant.
+     */
+    public boolean constant() {
+        return modifiers.contains(Modifier.CONSTANT);
+    }
+
+    /**
+     * @return Whether this field is dynamic.
+     */
+    public boolean dynamic() {
+        return modifiers.contains(Modifier.DYNAMIC);
+    }
+
+    /**
      * Evaluates the default value of this field.
      *
      * @param event The event to evaluate the default value in.
@@ -107,24 +117,39 @@ public final class Field<T> {
         return defaultExpression.getArray(event);
     }
 
+    /**
+     * @return The field's name.
+     */
     public String name() {
         return name;
     }
 
+    /**
+     * @return The classinfo this field accepts/returns.
+     */
     public ClassInfo<T> type() {
         return type;
     }
 
+    /**
+     * @return Whether this field accepts/returns a single value (or multiple values if false)
+     */
     public boolean single() {
         return single;
     }
 
+    /**
+     * @return The unparsed string for the default expression.
+     */
     public @Nullable String defaultExpressionString() {
         return defaultExpressionString;
     }
 
-    public Set<Modifier> modifiers() {
-        return modifiers;
+    /**
+     * @return An unmodifiable set containing the {@link Modifier}s applicable to this field.
+     */
+    public @Unmodifiable Set<Modifier> modifiers() {
+        return Collections.unmodifiableSet(modifiers);
     }
 
     @Override

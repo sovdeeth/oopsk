@@ -48,6 +48,10 @@ public class Struct {
         this.template = template;
         fieldValues = new HashMap<>();
         for (Field<?> field : template.getFields()) {
+            // skip dynamic fields
+            if (field.dynamic())
+                continue;
+
             // check if the field has an initial value
             if (initialValues != null && initialValues.containsKey(field.name())) {
                 Expression<?> expr = initialValues.get(field.name());
