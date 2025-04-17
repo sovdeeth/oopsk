@@ -9,17 +9,16 @@ import ch.njol.skript.doc.Description;
 import ch.njol.skript.doc.Example;
 import ch.njol.skript.doc.Name;
 import ch.njol.skript.doc.Since;
-import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.Literal;
-import ch.njol.skript.lang.ParseContext;
 import ch.njol.skript.lang.SkriptParser;
 import ch.njol.skript.lang.function.Functions;
 import ch.njol.skript.registrations.Classes;
-import ch.njol.skript.util.LiteralUtils;
 import ch.njol.skript.util.Utils;
 import com.sovdee.oopsk.Oopsk;
 import com.sovdee.oopsk.core.Field;
+import com.sovdee.oopsk.core.Field.Modifier;
 import com.sovdee.oopsk.core.StructTemplate;
+import com.sovdee.oopsk.events.DynamicFieldEvalEvent;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -27,8 +26,10 @@ import org.skriptlang.skript.lang.entry.EntryContainer;
 import org.skriptlang.skript.lang.structure.Structure;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -90,12 +91,20 @@ public class StructStructTemplate extends Structure {
             return false;
         }
         template = new StructTemplate(name, fields);
+        if (!templateManager.addTemplate(template))
+            return false;
 
-        return templateManager.addTemplate(template);
+        // delayed parse so all fields are present
+        getParser().setCurrentEvent("parse template", DynamicFieldEvalEvent.class);
+        if (!template.parseFields())
+            return false;
+        getParser().deleteCurrentEvent();
+
+        return true;
     }
 
 
-    private static final Pattern fieldPattern = Pattern.compile("(?<const>const(?:ant)? )?(?<name>[\\w ]+): (?<type>[\\w ]+?)(?: ?= ?(?<value>.+))?");
+    private static final Pattern fieldPattern = Pattern.compile("(?<const>const(?:ant)? )?(?<dynamic>dynamic)?(?<name>[\\w ]+): (?<type>[\\w ]+?)(?: ?= ?(?<value>.+))?");
 
     private List<Field<?>> getFields(@NotNull SectionNode node) {
         List<Field<?>> fields = new ArrayList<>();
@@ -108,7 +117,18 @@ public class StructStructTemplate extends Structure {
                     Skript.error("invalid field: " + key);
                     return null;
                 }
-                boolean constant = matcher.group("const") != null;
+
+                Set<Modifier> modifiers = EnumSet.noneOf(Modifier.class);
+
+                if (matcher.group("const") != null)
+                    modifiers.add(Modifier.CONSTANT);
+
+                if (matcher.group("dynamic") != null) {
+                    if (modifiers.contains(Modifier.CONSTANT))
+                        Skript.warning("All dynamic fields are already constant, so declaring them as both is unnecessary.");
+                    modifiers.add(Modifier.DYNAMIC);
+                    modifiers.add(Modifier.CONSTANT);
+                }
                 // parse the field name
                 String fieldName = matcher.group("name").trim().toLowerCase(Locale.ENGLISH);
                 if (fieldName.isEmpty()) {
@@ -129,18 +149,9 @@ public class StructStructTemplate extends Structure {
                     Skript.error("invalid field type: " + matcher.group("type").trim());
                     return null;
                 }
-                // parse the default value
-                Expression<?> defaultValue = null;
-                if (matcher.group("value") != null) {
-                    //noinspection unchecked
-                    defaultValue = new SkriptParser(matcher.group("value"), SkriptParser.ALL_FLAGS, ParseContext.DEFAULT).parseExpression(fieldType.getC());
-                    if (defaultValue == null || LiteralUtils.hasUnparsedLiteral(defaultValue)) {
-                        Skript.error("Invalid default value for the given type: '" + matcher.group("value") + "'");
-                        return null;
-                    }
-                }
+
                 //noinspection rawtypes,unchecked
-                fields.add(new Field<>(fieldName, (ClassInfo) fieldType, !isPlural, constant, defaultValue));
+                fields.add(new Field<>(fieldName, (ClassInfo) fieldType, !isPlural, matcher.group("value"), modifiers));
             }
         }
         return fields;

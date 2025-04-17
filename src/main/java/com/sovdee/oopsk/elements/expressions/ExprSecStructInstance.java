@@ -44,10 +44,10 @@ import java.util.regex.Pattern;
         data: {_data::*}
     """)
 @Since("1.0")
-public class ExprStructInstance extends SectionExpression<Struct> implements SyntaxRuntimeErrorProducer {
+public class ExprSecStructInstance extends SectionExpression<Struct> implements SyntaxRuntimeErrorProducer {
 
     static {
-        Skript.registerExpression(ExprStructInstance.class, Struct.class, ExpressionType.SIMPLE,
+        Skript.registerExpression(ExprSecStructInstance.class, Struct.class, ExpressionType.SIMPLE,
                 "[a[n]] <([\\w ]+)> struct [instance] [with [the] [initial] values [of]]");
     }
 
@@ -106,6 +106,10 @@ public class ExprStructInstance extends SectionExpression<Struct> implements Syn
                 Field<?> field = template.getField(fieldName);
                 if (field == null) {
                     Skript.error("Field '" + fieldName + "' does not exist in struct '" + name + "'.");
+                    return false;
+                }
+                if (field.dynamic()) {
+                    Skript.error("Cannot assign values to dynamic fields.");
                     return false;
                 }
                 // parse the value

@@ -2,6 +2,7 @@ package com.sovdee.oopsk.core;
 
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.util.ContextlessEvent;
+import com.sovdee.oopsk.events.DynamicFieldEvalEvent;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -84,6 +85,8 @@ public class Struct {
      * @return The value of the field, or null if the field does not exist in this struct.
      */
     public <T> T[] getFieldValue(Field<T> field) {
+        if (field.dynamic())
+            return field.defaultValue(new DynamicFieldEvalEvent(this));
         //noinspection unchecked
         return (T[]) fieldValues.get(field);
     }

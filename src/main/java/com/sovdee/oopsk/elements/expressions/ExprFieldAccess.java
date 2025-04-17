@@ -162,7 +162,7 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
     public Class<?> @Nullable [] acceptChange(ChangeMode mode) {
         // if the field is constant, we cannot change it
         if (areAllFieldsConstant) {
-            Skript.error("Cannot change a constant field.");
+            Skript.error("Cannot change a constant or dynamic field.");
             return null;
         }
 
