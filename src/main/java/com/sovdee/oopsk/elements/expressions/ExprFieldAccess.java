@@ -32,6 +32,7 @@ import org.skriptlang.skript.lang.converter.Converters;
 import org.skriptlang.skript.log.runtime.SyntaxRuntimeErrorProducer;
 
 import java.lang.reflect.Array;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -385,8 +386,8 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
             struct.setFieldValue(field, newValue);
 
         } else if (mode == ChangeMode.REMOVE || mode == ChangeMode.REMOVE_ALL) {
-            List<T> deltaList = Arrays.asList(convertedDelta);
-            List<T> valuesList = Arrays.asList(fieldValue);
+            List<T> deltaList = new ArrayList<>(Arrays.asList(convertedDelta));
+            List<T> valuesList = new ArrayList<>(Arrays.asList(fieldValue));
             for (Iterator<T> fieldIterator = valuesList.iterator(); fieldIterator.hasNext(); ) {
                 T value = fieldIterator.next();
 
