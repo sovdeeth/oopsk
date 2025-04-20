@@ -1,0 +1,51 @@
+struct basic:
+    a: int
+    b: strings
+    c: entitytype = cow
+
+test "basic struct behavior":
+    set {_struct} to a basic struct
+    assert {_struct}->a is not set with "struct field a was somehow set"
+    assert {_struct}->b is not set with "struct field b was somehow set"
+    assert {_struct}->c is a cow with "struct field c was not set to cow"
+
+    set {_struct}->a to 1
+    assert {_struct}->a is 1 with "struct field a was not set to 1"
+    set {_struct}->b to "test"
+    assert {_struct}->b is "test" with "struct field b was not set to test"
+    set {_struct}->c to pig
+    assert {_struct}->c is a pig with "struct field c was not set to pig"
+
+    set {_a} to "test"
+    set {_struct}->a to {_a}
+    assert {_struct}->a is 1 with "setting struct field a to a string modified the value"
+
+    remove 2 from {_struct}->a
+    assert {_struct}->a is -1 with "removing from struct field a did not work"
+
+    add 10 to {_struct}->a
+    assert {_struct}->a is 9 with "adding to struct field a did not work"
+
+    reset {_struct}->a
+    assert {_struct}->a is not set with "resetting struct field a did not work"
+
+    reset {_struct}->c
+    assert {_struct}->c is a cow with "resetting struct field c did not work"
+
+    set {_struct}->a to 1.1
+    assert {_struct}->a is 1 with "setting struct field a to a float did not work"
+
+    delete {_struct}->a
+    assert {_struct}->a is not set with "deleting struct field a did not work"
+
+    add "test" to {_struct}->b
+    assert {_struct}->b is "test" and "test" with "adding to struct field b did not work"
+
+    set {_struct}->b to "test", "hello", and "world"
+    assert {_struct}->b is "test", "hello", and "world" with "setting struct field b to multiple strings did not work"
+
+    remove "hello" from {_struct}->b
+    assert {_struct}->b is "test" and "world" with "removing from struct field b did not work"
+
+    reset {_struct}->b
+    assert {_struct}->b is not set with "resetting struct field b did not work"
