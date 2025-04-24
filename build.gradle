@@ -31,8 +31,4 @@ dependencies {
 
 processResources {
     filter ReplaceTokens, tokens: ["version": project.property("version")]
-    from("lang/") {
-        include '*.lang'
-        into 'lang/'
-    }
 }

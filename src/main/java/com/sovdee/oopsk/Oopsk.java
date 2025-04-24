@@ -52,12 +52,11 @@ public final class Oopsk extends JavaPlugin {
         }
     }
 
-
-
     @Override
     public void onEnable() {
         instance = this;
         addon = Skript.registerAddon(this);
+        addon.setLanguageFileDirectory("lang");
         logger = this.getLogger();
         structManager = new StructManager();
         templateManager = new TemplateManager();
