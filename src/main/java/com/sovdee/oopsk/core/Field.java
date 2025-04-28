@@ -63,10 +63,6 @@ public final class Field<T> {
         this.type = type;
         this.single = single;
         this.modifiers = modifiers;
-        Expression<? extends T> expr;
-        if (defaultExpressionString == null && (expr = type.getDefaultExpression()) != null) {
-            this.defaultExpression = expr;
-        }
         this.defaultExpressionString = defaultExpressionString;
     }
 
