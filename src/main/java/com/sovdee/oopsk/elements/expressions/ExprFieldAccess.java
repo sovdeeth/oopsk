@@ -203,11 +203,14 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
                     .flatMap(classInfo -> Arithmetics.getOperations(operator, classInfo.getC()).stream())
                     .filter(operationInfo ->
                             Arrays.stream(returnTypes).anyMatch((type) ->
-                                    type.isAssignableFrom(operationInfo.getReturnType())))
-                    .map(OperationInfo::getLeft)
+                                    operationInfo.getConverted(operationInfo.getLeft(), operationInfo.getRight(), type) != null))
+                    .map(OperationInfo::getRight)
                     .collect(Collectors.toSet()));
             // return all classes
-            return distinctClasses.toArray(new Class<?>[0]);
+            Class<?>[] accepted = distinctClasses.toArray(new Class<?>[0]);
+            if (accepted.length == 0)
+                return null;
+            return accepted;
 
         }
         return null;
@@ -324,8 +327,11 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
             // for each delta value, look for an operation that returns the field type and apply it
             for (Object newValue : delta) {
                 //noinspection rawtypes
-                OperationInfo info = Arithmetics.getOperationInfo(operator, fieldClass != null ? (Class) fieldClass : newValue.getClass(), newValue.getClass());
-                if (info == null || !field.type().getC().isAssignableFrom(info.getReturnType()))
+                OperationInfo info = Arithmetics.lookupOperationInfo(operator,
+                        (Class) (fieldClass != null ? fieldClass : newValue.getClass()),
+                        newValue.getClass(),
+                        (Class) (fieldClass != null ? fieldClass : Object.class));
+                if (info == null)
                     continue; // no operation or wrong return type
 
                 Object value = fieldValue == null ? Arithmetics.getDefaultValue(info.getLeft()) : fieldValue;
