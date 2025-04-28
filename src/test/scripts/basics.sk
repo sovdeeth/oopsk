@@ -4,19 +4,31 @@ struct basic:
     c: entitytype = cow
 
 test "basic struct behavior":
+    broadcast "a"
     set {_struct} to a basic struct
+    broadcast "b"
     assert {_struct}->a is not set with "struct field a was somehow set"
+    broadcast "c"
     assert {_struct}->b is not set with "struct field b was somehow set"
+    broadcast "d"
     assert {_struct}->c is a cow with "struct field c was not set to cow"
+    broadcast "e"
 
     set {_struct}->a to 1
+    broadcast "f"
     assert {_struct}->a is 1 with "struct field a was not set to 1"
+    broadcast "g"
     set {_struct}->b to "test"
+    broadcast "h"
     assert {_struct}->b is "test" with "struct field b was not set to test"
+    broadcast "i"
     set {_struct}->c to pig
+    broadcast "j"
     assert {_struct}->c is a pig with "struct field c was not set to pig"
+    broadcast "k"
 
     set {_a} to "test"
+    broadcast "l"
     set {_struct}->a to {_a}
     assert {_struct}->a is 1 with "setting struct field a to a string modified the value"
 
