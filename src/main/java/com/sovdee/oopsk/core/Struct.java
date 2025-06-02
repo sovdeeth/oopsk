@@ -2,6 +2,7 @@ package com.sovdee.oopsk.core;
 
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.util.ContextlessEvent;
+import ch.njol.skript.registrations.Classes;
 import com.sovdee.oopsk.events.DynamicFieldEvalEvent;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.NotNull;
@@ -28,11 +29,30 @@ public class Struct {
      * @param event    The event to evaluate the default values in.
      * @see StructManager#createStruct(StructTemplate, Event)
      */
-    Struct(@NotNull StructTemplate template, @Nullable Event event) {
+    public Struct(@NotNull StructTemplate template, @Nullable Event event) {
         this.template = template;
         fieldValues = new HashMap<>();
         for (Field<?> field : template.getFields()) {
             fieldValues.put(field, field.defaultValue(event));
+        }
+    }
+
+    /**
+     * Copy constructor for creating a struct that's a 'deep' copy of another struct.
+     * Uses {@link Classes#clone(Object)} to clone the field values.
+     *
+     * @param source The struct to copy from.
+     * @see StructManager#createStruct(StructTemplate, Event)
+     */
+    public Struct(Struct source) {
+        this.template = source.template;
+        fieldValues = new HashMap<>();
+        for (Map.Entry<Field<?>, Object[]> entry : source.fieldValues.entrySet()) {
+            Field<?> field = entry.getKey();
+            Object[] value = entry.getValue();
+            // clone the value array
+            Object[] clonedValue = (Object[]) Classes.clone(value);
+            fieldValues.put(field, clonedValue);
         }
     }
 
