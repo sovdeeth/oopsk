@@ -1,0 +1,27 @@
+struct copyable:
+    copy_num: int
+    copy_vectors: vectors
+
+test "copy structs":
+    set {_A} to a copyable struct:
+        copy_num: 1
+        copy_vectors: vector(1, 2, 3) and vector(4, 5, 6)
+
+    assert {_A}->copy_num is 1 with "copy_num was not set correctly"
+    assert {_A}->copy_vectors is vector(1, 2, 3) and vector(4, 5, 6) with "copy_vectors was not set correctly"
+
+    set {_B} to a struct copy of {_A}
+    assert {_B}->copy_num is 1 with "copy_num was not copied correctly"
+    assert {_B}->copy_vectors is vector(1, 2, 3) and vector(4, 5, 6) with "copy_vectors was not copied correctly"
+
+    set {_B}->copy_num to 2
+    assert {_A}->copy_num is 1 with "copy_num was changed in original after copying"
+    assert {_B}->copy_num is 2 with "copy_num was not changed in copy"
+
+    set x of {_A}->copy_vectors to 10
+    assert {_A}->copy_vectors is vector(10, 2, 3) and vector(10, 5, 6) with "copy_vectors was not changed in original"
+    assert {_B}->copy_vectors is vector(1, 2, 3) and vector(4, 5, 6) with "copy_vectors was changed in copy"
+
+    set {_B}->copy_vectors to vector(7, 8, 9) and vector(10, 11, 12)
+    assert {_A}->copy_vectors is vector(10, 2, 3) and vector(10, 5, 6) with "copy_vectors was changed in original after copying"
+    assert {_B}->copy_vectors is vector(7, 8, 9) and vector(10, 11, 12) with "copy_vectors was not changed in copy"
