@@ -130,7 +130,7 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
     @Override
     protected Object[] get(Event event, Struct[] source) {
         if (source.length == 0)
-            return null;
+            return new Object[0];
         // get actual struct and template
         Struct struct = source[0];
         StructTemplate template = struct.getTemplate();
@@ -138,7 +138,7 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
         Field<?> field = template.getField(fieldName);
         if (field == null) {
             error("Field " + fieldName + " not found in struct " + template.getName());
-            return null;
+            return new Object[0];
         }
         var value = struct.getFieldValue(field);
         // check type is accurate to what we claimed
@@ -153,7 +153,7 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
             // if the field is not valid, and the value is not convertible, error
             error("The " + field + " of " + struct + " is not the same type it claimed to be at parse time. " +
                     "This likely was caused by template changes. Consider reloading this script.");
-            return null;
+            return new Object[0];
         }
         // get the value
         return value;
