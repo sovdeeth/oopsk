@@ -1,5 +1,6 @@
 package com.sovdee.oopsk.elements.structures;
 
+import ch.njol.skript.ScriptLoader;
 import ch.njol.skript.Skript;
 import ch.njol.skript.classes.ClassInfo;
 import ch.njol.skript.config.Node;
@@ -121,7 +122,7 @@ public class StructStructTemplate extends Structure {
         for (Node child : node) {
             if (child instanceof SimpleNode simpleNode) {
                 // match the field pattern
-                String key = simpleNode.getKey();
+                String key = ScriptLoader.replaceOptions(simpleNode.getKey());
                 Matcher matcher;
                 if (key == null || !(matcher = fieldPattern.matcher(key)).matches()) {
                     Skript.error("invalid field: " + key);
