@@ -177,6 +177,11 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
             // return all return types
             return Arrays.stream(returnTypes).map(Class::arrayType).toArray(Class<?>[]::new);
 
+        // if a field is single and object, it should allow object stuff
+        if (isAnyFieldSingle && returnType == Object.class) {
+            return new Class<?>[]{Object.class};
+        }
+
         // if the mode is set, always allow changes
         if (mode == ChangeMode.SET)
             // return all return types
