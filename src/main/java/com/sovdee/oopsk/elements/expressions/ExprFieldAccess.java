@@ -184,6 +184,11 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
 
         // if we have a single field, we can delegate to that type's changer, so get all the classes from the changers
         if (isAnyFieldSingle) {
+            // if a field is single and object, it should accept all changers
+            if (returnType == Object.class) {
+                return new Class<?>[]{Object.class};
+            }
+
             Set<Class<?>> distinctClasses = Arrays.stream(returnTypes)
                     .map(Classes::getSuperClassInfo)
                     .filter(Objects::nonNull)
