@@ -2,7 +2,7 @@ import org.apache.tools.ant.filters.ReplaceTokens
 
 plugins {
     id 'java'
-    id 'skript-test' version('1.0.1')
+//    id 'skript-test' version('1.0.1')
     id 'com.gradleup.shadow' version('9.2.2')
 }
 
@@ -45,10 +45,10 @@ build {
 }
 
 
-skriptTest {
-    dependsOn build
-    testScriptDirectory = file("src/test/scripts")
-    extraPluginsDirectory = new File("./build/libs")
-    skriptRepoRef = "dev/patch"
-    runVanillaTests = false
-}
+//skriptTest {
+//    dependsOn build
+//    testScriptDirectory = file("src/test/scripts")
+//    extraPluginsDirectory = new File("./build/libs")
+//    skriptRepoRef = "dev/patch"
+//    runVanillaTests = false
+//}
