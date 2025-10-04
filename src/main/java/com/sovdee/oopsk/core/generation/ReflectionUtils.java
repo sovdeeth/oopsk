@@ -84,7 +84,6 @@ public class ReflectionUtils {
         try {
             @SuppressWarnings("unchecked")
             HashMap<String, String> langMap = (HashMap<String, String>) localizedLanguageField.get(null);
-            System.out.println("Adding language node: " + key + " -> " + value);
             langMap.put(key, value);
         } catch (Exception e) {
             throw new RuntimeException("Failed to add language node.", e);
@@ -95,7 +94,6 @@ public class ReflectionUtils {
         try {
             @SuppressWarnings("unchecked")
             HashMap<String, String> langMap = (HashMap<String, String>) localizedLanguageField.get(null);
-            System.out.println("Removing language node: " + key + " (was " + langMap.get(key) + ")");
             langMap.remove(key);
         } catch (Exception e) {
             throw new RuntimeException("Failed to add language node.", e);
@@ -123,7 +121,6 @@ public class ReflectionUtils {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        System.out.println("Registered custom struct class: " + classInfo.getName());
         disableRegistrations();
     }
 

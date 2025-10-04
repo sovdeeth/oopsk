@@ -20,7 +20,6 @@ import com.sovdee.oopsk.core.Field;
 import com.sovdee.oopsk.core.Field.Modifier;
 import com.sovdee.oopsk.core.Struct;
 import com.sovdee.oopsk.core.StructTemplate;
-import com.sovdee.oopsk.core.generation.TemporaryClassManager;
 import com.sovdee.oopsk.events.DynamicFieldEvalEvent;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.NotNull;
@@ -124,15 +123,12 @@ public class StructStructTemplate extends Structure {
         return templateManager.addTemplate(template);
     }
 
-    private TemporaryClassManager classManager;
     public Class<? extends Struct> customClass;
     public ClassInfo<?> customClassInfo;
 
     // this is a crime against humanity
     private void registerCustomType() {
-
-        assert classManager == null;
-        classManager = new TemporaryClassManager();
+        var classManager = Oopsk.getClassManager();
 
         // Create a dynamic subclass
         //noinspection unchecked
@@ -147,8 +143,6 @@ public class StructStructTemplate extends Structure {
 
         // hack open the Classes class to allow re-registration
         addClassInfo(customClassInfo);
-        System.out.println("By class: " + Classes.getExactClassInfo(customClass));
-        System.out.println("By user input: " + Classes.getClassInfoFromUserInput(name + " struct"));
     }
 
     private void unregisterCustomType() {
@@ -159,10 +153,6 @@ public class StructStructTemplate extends Structure {
             disableRegistrations();
             customClassInfo = null;
             customClass = null;
-        }
-        if (classManager != null) {
-            classManager.unloadAll();
-            classManager = null;
         }
     }
 

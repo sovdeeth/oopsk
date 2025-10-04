@@ -5,6 +5,7 @@ import ch.njol.skript.SkriptAddon;
 import ch.njol.skript.bstats.bukkit.Metrics;
 import com.sovdee.oopsk.core.StructManager;
 import com.sovdee.oopsk.core.TemplateManager;
+import com.sovdee.oopsk.core.generation.TemporaryClassManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
@@ -16,6 +17,7 @@ public final class Oopsk extends JavaPlugin {
     private static SkriptAddon addon;
     private static StructManager structManager;
     private static TemplateManager templateManager;
+    private static TemporaryClassManager classManager = new TemporaryClassManager();
     private static Logger logger;
 
     public static Oopsk getInstance() {
@@ -32,6 +34,10 @@ public final class Oopsk extends JavaPlugin {
 
     public static TemplateManager getTemplateManager() {
         return templateManager;
+    }
+
+    public static TemporaryClassManager getClassManager() {
+        return classManager;
     }
 
     public static void info(String message) {
