@@ -5,11 +5,13 @@ import ch.njol.skript.classes.ClassInfo;
 import ch.njol.skript.localization.Language;
 import ch.njol.skript.registrations.Classes;
 import com.sovdee.oopsk.core.Struct;
+import org.skriptlang.skript.lang.converter.Converter;
 import org.skriptlang.skript.lang.converter.ConverterInfo;
 import org.skriptlang.skript.lang.converter.Converters;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -154,7 +156,7 @@ public class ReflectionUtils {
             // already exists, adopt it.
             return customClassInfo;
         }
-        
+
         addLanguageNode("types." + codeName , name + " struct");
         customClassInfo = new ClassInfo<>(customClass, codeName)
                 .user(name + " structs?( types?)?");
@@ -166,12 +168,33 @@ public class ReflectionUtils {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        //noinspection unchecked
-        Converters.registerConverter(Struct.class, (Class<Struct>) customClass, struct -> {
+
+        // converters
+        Converter<Struct, Struct> castingConverter = struct -> {
             if (customClass.isInstance(struct))
                 return customClass.cast(struct);
             return null;
-        });
+        };
+        //noinspection unchecked
+        Converters.registerConverter(Struct.class, (Class<Struct>) customClass, castingConverter);
+
+        // chained converters
+        try {
+            getConverters().forEach(converterInfo -> {
+                if (converterInfo.getTo().equals(Struct.class))
+                    //noinspection unchecked
+                    Converters.registerConverter(converterInfo.getFrom(), (Class<Struct>) customClass, from -> {
+                        //noinspection unchecked
+                        Struct middle = ((Converter<Object, Struct>) converterInfo.getConverter()).convert((Object) from);
+                        if (middle == null)
+                            return null;
+                        return castingConverter.convert(middle);
+                    }, converterInfo.getFlags());
+            });
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
         disableRegistrations();
         return customClassInfo;
     }
@@ -179,9 +202,15 @@ public class ReflectionUtils {
     // Remove from all three collections
     public static void removeClassInfo(ClassInfo<?> classInfo) {
         try {
-            var converter = Converters.getConverterInfo(Struct.class, classInfo.getC());
-            if (converter != null)
-                getConverters().remove(converter);
+            Class<?> customClass = classInfo.getC();
+            List<ConverterInfo<?,?>> toRemove = new ArrayList<>();
+            var converters = getConverters();
+            for (var converterInfo : converters) {
+                if (converterInfo.getTo().equals(customClass))
+                    toRemove.add(converterInfo);
+            }
+            converters.removeAll(toRemove);
+
             getExactClassInfos().remove(classInfo.getC());
             getClassInfosByCodeName().remove(classInfo.getCodeName());
             resortClassInfos(classInfo);
