@@ -8,7 +8,7 @@ struct basic:
     d{@a}: number = {@a}
 
 test "basic struct behavior":
-    set {_struct} to a basic struct
+    set {_struct} to a basic struct instance
     assert {_struct}->a is not set with "struct field a was somehow set"
     assert {_struct}->b is not set with "struct field b was somehow set"
     assert {_struct}->c is a cow with "struct field c was not set to cow"

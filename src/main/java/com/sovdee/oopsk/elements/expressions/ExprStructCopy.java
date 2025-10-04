@@ -12,16 +12,16 @@ public class ExprStructCopy extends SimplePropertyExpression<Struct, Struct> {
 
     @Override
     public @Nullable Struct convert(Struct struct) {
-        return new Struct(struct);
+        return Struct.newInstance(struct);
     }
 
     @Override
     public Class<? extends Struct> getReturnType() {
-        return Struct.class;
+        return getExpr().getReturnType();
     }
 
     @Override
     protected String getPropertyName() {
-        return "copy";
+        return "struct copy";
     }
 }

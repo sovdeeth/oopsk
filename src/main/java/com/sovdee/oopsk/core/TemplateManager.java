@@ -18,6 +18,7 @@ import java.util.function.Predicate;
 public class TemplateManager {
 
     private final Map<String, StructTemplate> templates = new HashMap<>();
+    private final Map<Class<? extends Struct>, StructTemplate> templatesByClass = new HashMap<>();
 
     /**
      * Adds a new template to the manager. Attempts to reparent all orphaned structs that match this template's name.
@@ -29,6 +30,7 @@ public class TemplateManager {
         if (templates.containsKey(template.getName()))
             return false; // Template with the same name already exists
         templates.put(template.getName(), template);
+        templatesByClass.put(template.getCustomClass(), template);
         // reparent all orphaned structs of this template
         Oopsk.getStructManager().reparentStructs(template);
         return true; // Template added successfully
@@ -45,6 +47,16 @@ public class TemplateManager {
     }
 
     /**
+     * Retrieves a template by class.
+     *
+     * @param structClass The name of the template to retrieve.
+     * @return The template, or null if it does not exist.
+     */
+    public StructTemplate getTemplate(Class<?extends Struct> structClass) {
+        return templatesByClass.get(structClass);
+    }
+
+    /**
      * Removes a template from the manager. This will orphan all structs of this template.
      *
      * @param template The template to remove.
@@ -54,6 +66,7 @@ public class TemplateManager {
         if (!templates.containsKey(name))
             return; // Template with the given name does not exist
         templates.remove(name);
+        templatesByClass.remove(template.getCustomClass());
         // mark all structs of this template as orphaned
         Oopsk.getStructManager().orphanStructs(template);
     }

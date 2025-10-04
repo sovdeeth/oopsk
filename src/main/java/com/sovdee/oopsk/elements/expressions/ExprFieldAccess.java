@@ -34,6 +34,7 @@ import org.skriptlang.skript.log.runtime.SyntaxRuntimeErrorProducer;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -80,7 +81,6 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
         }
         fieldName = fieldName.trim().toLowerCase(Locale.ENGLISH);
         if (!updateFieldGuesses()) {
-            Skript.error("No field with name '" + fieldName + "' found.");
             return false;
         }
         return true;
@@ -91,20 +91,42 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
      * @return True if a field was found, false otherwise.
      */
     private boolean updateFieldGuesses() {
+        var templateManager = Oopsk.getTemplateManager();
+
+        // get all possible struct templates this could be
+        Set<StructTemplate> templates = new HashSet<>();
+        Class<?>[] possibleReturnTypes = getExpr().possibleReturnTypes();
+        for (Class<?> type : possibleReturnTypes) {
+            if (type != Struct.class && Struct.class.isAssignableFrom(type)) {
+                templates.add(templateManager.getTemplate(type.asSubclass(Struct.class)));
+            } else if (type == Object.class || type == Struct.class) {
+                // if Object or Struct, we have to assume all templates
+                templates.clear();
+                break;
+            }
+        }
+
         // get all possible fields that this could be accessing
-        var fieldSetMap = Oopsk.getTemplateManager()
-                .getFieldsMatching((field -> field.name().equalsIgnoreCase(fieldName)));
+        var fieldSetMap = templateManager.getFieldsMatching(
+                field -> field.name().equalsIgnoreCase(fieldName));
         if (fieldSetMap.isEmpty()) {
+            noFieldFoundError(templates);
             return false;
         }
         // collapse setMap to a 1:1 map of template -> field
         // since our predicate is based on name, there should never be a template with multiple fields that match.
         possibleFields = new WeakHashMap<>();
         for (Map.Entry<StructTemplate, Set<Field<?>>> entry : fieldSetMap.entrySet()) {
+            if (!templates.isEmpty() && !templates.contains(entry.getKey()))
+                continue; // if we have a limited set of templates, skip ones that aren't in it
             StructTemplate template = entry.getKey();
             Set<Field<?>> fields = entry.getValue();
             // if there are multiple fields, pick the first one
             possibleFields.put(template, fields.stream().findFirst().orElse(null));
+        }
+        if (possibleFields.isEmpty()) {
+            noFieldFoundError(templates);
+            return false;
         }
         // use super type of all possible fields
         returnTypes = possibleFields.values().stream()
@@ -125,6 +147,14 @@ public class ExprFieldAccess extends PropertyExpression<Struct, Object> implemen
             areAllFieldsConstant |= field.constant();
         }
         return true;
+    }
+
+    private void noFieldFoundError(Set<StructTemplate> templates) {
+        if (!templates.isEmpty()) {
+            Skript.error("No field with name '" + fieldName + "' found in the structs " + Classes.toString(templates.stream().map(StructTemplate::getName).toArray(), false) + ".");
+        } else {
+            Skript.error("No field with name '" + fieldName + "' found in any struct.");
+        }
     }
 
     @Override

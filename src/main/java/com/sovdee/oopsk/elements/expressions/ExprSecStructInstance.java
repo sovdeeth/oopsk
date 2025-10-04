@@ -17,6 +17,7 @@ import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.TriggerItem;
 import ch.njol.skript.util.LiteralUtils;
 import ch.njol.util.Kleenean;
+import ch.njol.util.coll.CollectionUtils;
 import com.sovdee.oopsk.Oopsk;
 import com.sovdee.oopsk.core.Field;
 import com.sovdee.oopsk.core.Struct;
@@ -48,7 +49,7 @@ public class ExprSecStructInstance extends SectionExpression<Struct> implements 
 
     static {
         Skript.registerExpression(ExprSecStructInstance.class, Struct.class, ExpressionType.SIMPLE,
-                "[a[n]] <([\\w ]+)> struct [instance] [with [the] [initial] values [of]]");
+                "[a[n]] <([\\w ]+)> struct instance [with [the] [initial] values [of]]");
     }
 
     private String name;
@@ -118,11 +119,10 @@ public class ExprSecStructInstance extends SectionExpression<Struct> implements 
                 }
 
                 // parse the value
-                //noinspection unchecked
                 Expression<?> expr = new SkriptParser(value, SkriptParser.ALL_FLAGS, ParseContext.DEFAULT).parseExpression(field.type().getC());
                 expr = LiteralUtils.defendExpression(expr);
                 if (expr == null || !LiteralUtils.canInitSafely(expr)) {
-                    Skript.error("Invalid value for field '" + fieldName + "' in struct '" + name + "'.");
+//                    Skript.error("Invalid value for field '" + fieldName + "' in struct '" + name + "'.");
                     return false;
                 }
                 // store in map
@@ -140,7 +140,8 @@ public class ExprSecStructInstance extends SectionExpression<Struct> implements 
         StructTemplate template = Oopsk.getTemplateManager().getTemplate(name);
         if (template == null)
             error("A struct by the name of '" + name + "' does not exist.");
-        return new Struct[] {Oopsk.getStructManager().createStruct(template, event, parsedFieldValues)};
+        Struct struct = Oopsk.getStructManager().createStruct(template, event, parsedFieldValues);
+        return CollectionUtils.array(struct);
     }
 
     @Override
@@ -149,7 +150,11 @@ public class ExprSecStructInstance extends SectionExpression<Struct> implements 
     }
 
     @Override
-    public Class<Struct> getReturnType() {
+    public Class<? extends Struct> getReturnType() {
+        var template = Oopsk.getTemplateManager().getTemplate(name);
+        if (template != null && template.getCustomClass() != null) {
+            return template.getCustomClass();
+        }
         return Struct.class;
     }
 
