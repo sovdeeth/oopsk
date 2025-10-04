@@ -134,15 +134,9 @@ public class StructStructTemplate extends Structure {
         //noinspection unchecked
         customClass = (Class<? extends Struct>) classManager.createTemporarySubclass("Struct_"+ name.replaceAll("[^a-zA-Z0-9_]", "_"));
         assert customClass != null;
-        // Register the class if it doesn't exist
-        String codeName = name.toLowerCase(Locale.ENGLISH) + "struct";
-        codeName = codeName.replaceAll("_", "underscore");
-        addLanguageNode("types." + codeName , name + " struct");
-        customClassInfo = new ClassInfo<>(customClass, codeName)
-                .user(name + " structs?( types?)?");
 
         // hack open the Classes class to allow re-registration
-        addClassInfo(customClassInfo);
+        addClassInfo(customClass, name);
     }
 
     private void unregisterCustomType() {

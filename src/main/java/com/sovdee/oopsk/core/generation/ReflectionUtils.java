@@ -4,12 +4,16 @@ import ch.njol.skript.Skript;
 import ch.njol.skript.classes.ClassInfo;
 import ch.njol.skript.localization.Language;
 import ch.njol.skript.registrations.Classes;
+import com.sovdee.oopsk.core.Struct;
+import org.skriptlang.skript.lang.converter.ConverterInfo;
+import org.skriptlang.skript.lang.converter.Converters;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 
 public class ReflectionUtils {
 
@@ -19,6 +23,7 @@ public class ReflectionUtils {
     private static final Field acceptRegistrationsField;
     private static final Field localizedLanguageField;
     private static final Field classInfosField;
+    private static final Field convertersField;
     private static final Method sortClassInfosMethod;
 
     static {
@@ -30,6 +35,7 @@ public class ReflectionUtils {
             acceptRegistrationsField = Skript.class.getDeclaredField("acceptRegistrations");
             localizedLanguageField = Language.class.getDeclaredField("localizedLanguage");
             classInfosField = Classes.class.getDeclaredField("classInfos");
+            convertersField = Converters.class.getDeclaredField("CONVERTERS");
 
             // Get the method
             sortClassInfosMethod = Classes.class.getDeclaredMethod("sortClassInfos");
@@ -42,6 +48,7 @@ public class ReflectionUtils {
             acceptRegistrationsField.setAccessible(true);
             localizedLanguageField.setAccessible(true);
             classInfosField.setAccessible(true);
+            convertersField.setAccessible(true);
             sortClassInfosMethod.setAccessible(true);
 
         } catch (Exception e) {
@@ -63,6 +70,11 @@ public class ReflectionUtils {
         } catch (Exception e) {
             throw new RuntimeException("Failed to modify acceptRegistrations field", e);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    public static List<ConverterInfo<?,?>> getConverters() throws Exception {
+        return (List<ConverterInfo<?, ?>>) convertersField.get(null);
     }
 
     @SuppressWarnings("unchecked")
@@ -113,20 +125,63 @@ public class ReflectionUtils {
         sortClassInfosMethod.invoke(null);
     }
 
-    public static void addClassInfo(ClassInfo<?> classInfo) {
+    public static ClassInfo<? extends Struct> addClassInfo(Class<? extends Struct> customClass, String name) {
+
+        // get the classinfo if it exists
+        String codeName = name.toLowerCase(Locale.ENGLISH) + "struct";
+        codeName = codeName.replaceAll("_", "underscore");
+
+        //noinspection unchecked
+        ClassInfo<? extends Struct> customClassInfo = (ClassInfo<? extends Struct>) Classes.getClassInfoNoError(codeName);
+        if (customClassInfo != null) {
+            if (!customClassInfo.getC().equals(customClass)) {
+                // conflict, remove the old one and try again
+                removeClassInfo(customClassInfo);
+                return addClassInfo(customClass, name);
+            }
+            // already exists, adopt it.
+            return customClassInfo;
+        }
+
+        // get by class
+        customClassInfo = Classes.getExactClassInfo(customClass);
+        if (customClassInfo != null) {
+            if (!customClassInfo.getCodeName().equals(codeName)) {
+                // conflict, remove the old one and try again
+                removeClassInfo(customClassInfo);
+                return addClassInfo(customClass, name);
+            }
+            // already exists, adopt it.
+            return customClassInfo;
+        }
+        
+        addLanguageNode("types." + codeName , name + " struct");
+        customClassInfo = new ClassInfo<>(customClass, codeName)
+                .user(name + " structs?( types?)?");
+
         enableRegistrations();
-        Classes.registerClass(classInfo);
+        Classes.registerClass(customClassInfo);
         try {
             resortClassInfos();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+        //noinspection unchecked
+        Converters.registerConverter(Struct.class, (Class<Struct>) customClass, struct -> {
+            if (customClass.isInstance(struct))
+                return customClass.cast(struct);
+            return null;
+        });
         disableRegistrations();
+        return customClassInfo;
     }
 
     // Remove from all three collections
     public static void removeClassInfo(ClassInfo<?> classInfo) {
         try {
+            var converter = Converters.getConverterInfo(Struct.class, classInfo.getC());
+            if (converter != null)
+                getConverters().remove(converter);
             getExactClassInfos().remove(classInfo.getC());
             getClassInfosByCodeName().remove(classInfo.getCodeName());
             resortClassInfos(classInfo);
