@@ -138,8 +138,10 @@ public class ExprSecStructInstance extends SectionExpression<Struct> implements 
     @Override
     protected Struct @Nullable [] get(Event event) {
         StructTemplate template = Oopsk.getTemplateManager().getTemplate(name);
-        if (template == null)
+        if (template == null) {
             error("A struct by the name of '" + name + "' does not exist.");
+            return CollectionUtils.array();
+        }
         Struct struct = Oopsk.getStructManager().createStruct(template, event, parsedFieldValues);
         return CollectionUtils.array(struct);
     }
