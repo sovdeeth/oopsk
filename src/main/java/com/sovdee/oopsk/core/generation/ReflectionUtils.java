@@ -185,7 +185,7 @@ public class ReflectionUtils {
                     //noinspection unchecked
                     Converters.registerConverter(converterInfo.getFrom(), (Class<Struct>) customClass, from -> {
                         //noinspection unchecked
-                        Struct middle = ((Converter<Object, Struct>) converterInfo.getConverter()).convert((Object) from);
+                        Struct middle = ((Converter<Object, Struct>) converterInfo.getConverter()).convert(from);
                         if (middle == null)
                             return null;
                         return castingConverter.convert(middle);
