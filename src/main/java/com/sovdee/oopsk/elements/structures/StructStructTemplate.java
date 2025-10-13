@@ -18,6 +18,7 @@ import ch.njol.skript.util.Utils;
 import com.sovdee.oopsk.Oopsk;
 import com.sovdee.oopsk.core.Field;
 import com.sovdee.oopsk.core.Field.Modifier;
+import com.sovdee.oopsk.core.Struct;
 import com.sovdee.oopsk.core.StructTemplate;
 import com.sovdee.oopsk.events.DynamicFieldEvalEvent;
 import org.bukkit.event.Event;
@@ -34,6 +35,13 @@ import java.util.Set;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static com.sovdee.oopsk.core.generation.ReflectionUtils.addClassInfo;
+import static com.sovdee.oopsk.core.generation.ReflectionUtils.addLanguageNode;
+import static com.sovdee.oopsk.core.generation.ReflectionUtils.disableRegistrations;
+import static com.sovdee.oopsk.core.generation.ReflectionUtils.enableRegistrations;
+import static com.sovdee.oopsk.core.generation.ReflectionUtils.removeClassInfo;
+import static com.sovdee.oopsk.core.generation.ReflectionUtils.removeLanguageNode;
 
 @Name("Struct Template")
 @Description({
@@ -76,11 +84,10 @@ public class StructStructTemplate extends Structure {
         name = regex.group(1).trim().toLowerCase(Locale.ENGLISH);
         this.entryContainer = entryContainer;
 
-        return entryContainer != null;
-    }
+        if (entryContainer == null) {
+            return false;
+        }
 
-    @Override
-    public boolean preLoad() {
         SectionNode node = entryContainer.getSource();
 
         if (node.isEmpty()) {
@@ -88,32 +95,77 @@ public class StructStructTemplate extends Structure {
             return false;
         }
 
-        List<Field<?>> fields = getFields(node);
-
-        if (fields == null)
-            return false;
-
         var templateManager = Oopsk.getTemplateManager();
 
         if (templateManager.getTemplate(name) != null) {
             Skript.error("Struct by the name of " + name + " already exists.");
             return false;
         }
-        template = new StructTemplate(name, fields);
-        if (!templateManager.addTemplate(template))
+
+        registerCustomType(); // TODO: safety against name clashes
+
+        return true;
+    }
+
+    @Override
+    public boolean preLoad() {
+        SectionNode node = entryContainer.getSource();
+        var templateManager = Oopsk.getTemplateManager();
+
+        List<Field<?>> fields = getFields(node);
+
+        if (fields == null) {
+            unregisterCustomType();
             return false;
+        }
+
+        template = new StructTemplate(name, fields, customClass);
+        return templateManager.addTemplate(template);
+    }
+
+    public Class<? extends Struct> customClass;
+    public ClassInfo<?> customClassInfo;
+
+    // this is a crime against humanity
+    private void registerCustomType() {
+        var classManager = Oopsk.getClassManager();
+
+        // Create a dynamic subclass
+        //noinspection unchecked
+        customClass = (Class<? extends Struct>) classManager.createTemporarySubclass("Struct_"+ name.replaceAll("[^a-zA-Z0-9_]", "_"));
+        assert customClass != null;
+
+        // hack open the Classes class to allow re-registration
+        addClassInfo(customClass, name);
+    }
+
+    private void unregisterCustomType() {
+        if (customClassInfo != null) {
+            enableRegistrations();
+            removeLanguageNode("types." + customClassInfo.getCodeName());
+            removeClassInfo(customClassInfo);
+            disableRegistrations();
+            customClassInfo = null;
+            customClass = null;
+        }
+    }
+
+
+    @Override
+    public boolean load() {
+        var templateManager = Oopsk.getTemplateManager();
 
         // delayed parse so all fields are present
         getParser().setCurrentEvent("parse template", DynamicFieldEvalEvent.class);
         if (!template.parseFields()) {
             templateManager.removeTemplate(template);
+            unregisterCustomType();
             return false;
         }
         getParser().deleteCurrentEvent();
 
         return true;
     }
-
 
     private static final Pattern fieldPattern = Pattern.compile("(?<const>const(?:ant)? )?(?<dynamic>dynamic)?(?<name>[\\w ]+): (?<type>[\\w ]+?)(?: ?= ?(?<value>.+))?");
 
@@ -175,15 +227,11 @@ public class StructStructTemplate extends Structure {
         }
         return fields;
     }
-    @Override
-    public boolean load() {
-
-        return true;
-    }
 
     @Override
     public void unload() {
         Oopsk.getTemplateManager().removeTemplate(template);
+        unregisterCustomType();
     }
 
     @Override

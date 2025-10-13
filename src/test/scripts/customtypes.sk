@@ -1,0 +1,28 @@
+struct custom:
+    a: int = 0
+    b: strings
+    c: custom struct
+
+struct standard:
+    a: int = 1
+
+local function test(a: custom struct) returns custom struct:
+    return {_a}
+
+test "custom struct behavior":
+    set {_a} to a custom struct instance
+    set {_b} to a custom struct instance:
+        a: 5
+        b: "hello"
+        c: {_a}
+    assert {_b}->a is 5 with "struct field a was not set to 5"
+    assert {_b}->b is "hello" with "struct field b was not set to hello"
+    assert {_b}->c is {_a} with "struct field c was not set to {_a}"
+    assert {_b}->c->a is 0 with "nested struct field a was not set to 0"
+
+    assert test({_b})->c is {_a} with "function did not return the correct struct"
+    assert test({_b})->c is a custom struct with "function returned struct field b was somehow set"
+
+    parse:
+        test(a standard struct instance)
+    assert last parse logs contain "Can't understand this condition/effect" with "function did not error on wrong struct type"

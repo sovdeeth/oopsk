@@ -22,6 +22,33 @@ public class Struct {
     private StructTemplate template;
     private final Map<Field<?>, Object[]> fieldValues;
 
+    public static Struct newInstance(@NotNull StructTemplate template, @Nullable Event event) {
+        Class<? extends Struct> structClass = template.getCustomClass();
+        try {
+            return structClass.getDeclaredConstructor(StructTemplate.class, Event.class).newInstance(template, event);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create new instance of struct class " + structClass.getName(), e);
+        }
+    }
+
+    public static Struct newInstance(Struct source) {
+        Class<? extends Struct> structClass = source.getTemplate().getCustomClass();
+        try {
+            return structClass.getDeclaredConstructor(Struct.class).newInstance(source);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create new instance of struct class " + structClass.getName(), e);
+        }
+    }
+
+    public static Struct newInstance(@NotNull StructTemplate template, @Nullable Event event, @Nullable Map<String, Expression<?>> initialValues) {
+        Class<? extends Struct> structClass = template.getCustomClass();
+        try {
+            return structClass.getDeclaredConstructor(StructTemplate.class, Event.class, Map.class).newInstance(template, event, initialValues);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create new instance of struct class " + structClass.getName(), e);
+        }
+    }
+
     /**
      * Creates a new struct with the given template and event.
      *
@@ -29,7 +56,7 @@ public class Struct {
      * @param event    The event to evaluate the default values in.
      * @see StructManager#createStruct(StructTemplate, Event)
      */
-    public Struct(@NotNull StructTemplate template, @Nullable Event event) {
+    protected Struct(@NotNull StructTemplate template, @Nullable Event event) {
         this.template = template;
         fieldValues = new HashMap<>();
         for (Field<?> field : template.getFields()) {
@@ -44,7 +71,7 @@ public class Struct {
      * @param source The struct to copy from.
      * @see StructManager#createStruct(StructTemplate, Event)
      */
-    public Struct(Struct source) {
+    protected Struct(Struct source) {
         this.template = source.template;
         fieldValues = new HashMap<>();
         for (Map.Entry<Field<?>, Object[]> entry : source.fieldValues.entrySet()) {
@@ -64,7 +91,7 @@ public class Struct {
      * @param initialValues The initial values to set in the struct. This is a map of field names to expressions.
      * @see StructManager#createStruct(StructTemplate, Event)
      */
-    Struct(@NotNull StructTemplate template, @Nullable Event event, @Nullable Map<String, Expression<?>> initialValues) {
+    protected Struct(@NotNull StructTemplate template, @Nullable Event event, @Nullable Map<String, Expression<?>> initialValues) {
         this.template = template;
         fieldValues = new HashMap<>();
         for (Field<?> field : template.getFields()) {

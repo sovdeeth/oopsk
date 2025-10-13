@@ -14,6 +14,7 @@ import java.util.Map;
 public class StructTemplate {
     private final String name;
     private final Map<String, Field<?>> fields;
+    private final Class<? extends Struct> customClass;
 
     /**
      * Creates a new struct template with the given name and fields.
@@ -21,8 +22,9 @@ public class StructTemplate {
      * @param name   The name of the template.
      * @param fields The fields of the template.
      */
-    public StructTemplate(String name, @NotNull List<Field<?>> fields) {
+    public StructTemplate(String name, @NotNull List<Field<?>> fields, Class<? extends Struct> customClass) {
         this.name = name;
+        this.customClass = customClass;
         this.fields = new HashMap<>();
         for (Field<?> field : fields) {
             this.fields.put(field.name(), field);
@@ -34,6 +36,13 @@ public class StructTemplate {
      */
     public String getName() {
         return name;
+    }
+
+    /**
+     * @return The custom class for this struct, or null if none was specified.
+     */
+    public Class<? extends Struct> getCustomClass() {
+        return customClass;
     }
 
     /**

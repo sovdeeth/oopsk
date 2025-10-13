@@ -41,7 +41,7 @@ public class StructManager {
      * @return The created struct.
      */
     public Struct createStruct(StructTemplate template, @Nullable Event event, @Nullable Map<String, Expression<?>> initialValues) {
-        Struct struct = new Struct(template, event, initialValues);
+        Struct struct = Struct.newInstance(template, event, initialValues);
         activeStructs.computeIfAbsent(template, k -> Collections.newSetFromMap(new WeakHashMap<>())).add(struct);
         return struct;
     }

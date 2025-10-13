@@ -2,6 +2,8 @@ import org.apache.tools.ant.filters.ReplaceTokens
 
 plugins {
     id 'java'
+//    id 'skript-test' version('1.0.1')
+    id 'com.gradleup.shadow' version('9.2.2')
 }
 
 group = 'com.sovdee'
@@ -12,6 +14,7 @@ test {
 
 repositories {
     mavenCentral()
+    mavenLocal()
     maven {
         url 'https://repo.papermc.io/repository/maven-public/'
     }
@@ -21,14 +24,31 @@ repositories {
 }
 
 dependencies {
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
-
     compileOnly 'org.spigotmc:spigot-api:1.21.4-R0.1-SNAPSHOT'
-    compileOnly "com.github.SkriptLang:Skript:2.11.0"
+    compileOnly "com.github.SkriptLang:Skript:2.12.2"
     compileOnly 'org.jetbrains:annotations:26.0.1'
+    implementation 'net.bytebuddy:byte-buddy:1.14.18' // for runtime code generation
 }
 
 processResources {
     filter ReplaceTokens, tokens: ["version": project.property("version")]
 }
+
+shadowJar {
+    relocate 'net.bytebuddy', 'com.sovdee.oopsk.bytebuddy'
+    minimize()
+    archiveClassifier.set('')
+}
+
+build {
+    dependsOn shadowJar
+}
+
+
+//skriptTest {
+//    dependsOn build
+//    testScriptDirectory = file("src/test/scripts")
+//    extraPluginsDirectory = new File("./build/libs")
+//    skriptRepoRef = "dev/patch"
+//    runVanillaTests = false
+//}

@@ -3,7 +3,7 @@ struct copyable:
     copy_vectors: vectors
 
 test "copy structs":
-    set {_A} to a copyable struct:
+    set {_A} to a copyable struct instance:
         copy_num: 1
         copy_vectors: vector(1, 2, 3) and vector(4, 5, 6)
 
