@@ -4,6 +4,7 @@ import ch.njol.skript.Skript;
 import ch.njol.skript.classes.ClassInfo;
 import ch.njol.skript.localization.Language;
 import ch.njol.skript.registrations.Classes;
+import ch.njol.util.Pair;
 import com.sovdee.oopsk.core.Struct;
 import org.skriptlang.skript.lang.converter.Converter;
 import org.skriptlang.skript.lang.converter.ConverterInfo;
@@ -16,6 +17,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class ReflectionUtils {
 
@@ -26,6 +28,7 @@ public class ReflectionUtils {
     private static final Field localizedLanguageField;
     private static final Field classInfosField;
     private static final Field convertersField;
+    private static final Field quickAccessConvertersField;
     private static final Method sortClassInfosMethod;
 
     static {
@@ -38,6 +41,7 @@ public class ReflectionUtils {
             localizedLanguageField = Language.class.getDeclaredField("localizedLanguage");
             classInfosField = Classes.class.getDeclaredField("classInfos");
             convertersField = Converters.class.getDeclaredField("CONVERTERS");
+            quickAccessConvertersField = Converters.class.getDeclaredField("QUICK_ACCESS_CONVERTERS");
 
             // Get the method
             sortClassInfosMethod = Classes.class.getDeclaredMethod("sortClassInfos");
@@ -51,6 +55,7 @@ public class ReflectionUtils {
             localizedLanguageField.setAccessible(true);
             classInfosField.setAccessible(true);
             convertersField.setAccessible(true);
+            quickAccessConvertersField.setAccessible(true);
             sortClassInfosMethod.setAccessible(true);
 
         } catch (Exception e) {
@@ -77,6 +82,11 @@ public class ReflectionUtils {
     @SuppressWarnings("unchecked")
     public static List<ConverterInfo<?,?>> getConverters() throws Exception {
         return (List<ConverterInfo<?, ?>>) convertersField.get(null);
+    }
+
+    public static Map<Pair<Class<?>, Class<?>>, ConverterInfo<?, ?>> getQuickAccessConverters() throws Exception {
+        //noinspection unchecked
+        return (Map<Pair<Class<?>, Class<?>>, ConverterInfo<?, ?>>) quickAccessConvertersField.get(null);
     }
 
     @SuppressWarnings("unchecked")
@@ -170,6 +180,12 @@ public class ReflectionUtils {
         }
 
         // converters
+        try {
+            //noinspection SuspiciousMethodCalls,removal
+            getQuickAccessConverters().remove(new Pair<>(Struct.class, customClass));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         Converter<Struct, Struct> castingConverter = struct -> {
             if (customClass.isInstance(struct))
                 return customClass.cast(struct);
@@ -206,10 +222,18 @@ public class ReflectionUtils {
             List<ConverterInfo<?,?>> toRemove = new ArrayList<>();
             var converters = getConverters();
             for (var converterInfo : converters) {
-                if (converterInfo.getTo().equals(customClass))
+                if (converterInfo.getTo().equals(customClass) || converterInfo.getFrom().equals(customClass))
                     toRemove.add(converterInfo);
             }
             converters.removeAll(toRemove);
+            // remove all converters from or to customClass
+            var quickAccessConverters = getQuickAccessConverters();
+            // remove all converters starting from customClass
+            for (var key : new ArrayList<>(quickAccessConverters.keySet())) {
+                if (key.getKey().equals(customClass) || key.getValue().equals(customClass)) {
+                    quickAccessConverters.remove(key);
+                }
+            }
 
             getExactClassInfos().remove(classInfo.getC());
             getClassInfosByCodeName().remove(classInfo.getCodeName());
