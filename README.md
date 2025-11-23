@@ -9,10 +9,16 @@ struct Message:
   contents: string
   sender: offline player
   const timestamp: date = now
+  converts to:
+    string via this->contents
 ```
 A template's name and field names are case-insensitive. The template name follows the same rules as a function name, while field names can only consist of letters, underscores, and spaces. 
 Each field has a name and a type, as well as an optional default value. This default value may be an expression, as it is evaluated when a struct is created, not when the template is registered.
 Adding `const` or `constant` to the start will prevent the field from being changed after creation.
+
+Structs also support conversion expressions, which allow you to define how a struct can be converted to other types. The syntax is 
+`<type> via <expression>`, where `<type>` is the type to convert to and `<expression>` is an expression that evaluates to that type. 
+The expression may use `this` to refer to the struct being converted. Multiple conversions can be defined by adding more lines under the `converts to:` section.
 
 Creating a struct involves a simple expression:
 ```
@@ -30,6 +36,13 @@ set {_a} to a message struct:
   sender: player
   contents: "hello world"
 ```
+
+### Custom Types
+
+Struct templates automatically create a new Skript type using the template's name + `struct`. 
+In the above example, `message struct` is now a valid Skript type that can be used in function parameters and other struct fields.
+**You should be very careful when reloading templates, as any existing code that used the type may break if the template was modified or removed.**
+ALWAYS reload all scripts after modifying templates to ensure all code is properly re-parsed.
 
 ### Type Safety
 oopsk attempts to ensure type safety at parse time via checking all fields with the given name. This means having unique field names across structs allows oopsk to give you more accurate parse errors, while sharing field names can result in invalid code not causing any errors during parsing. 
