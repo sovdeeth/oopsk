@@ -11,10 +11,13 @@ import ch.njol.skript.doc.Example;
 import ch.njol.skript.doc.Name;
 import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Literal;
+import ch.njol.skript.lang.ParseContext;
 import ch.njol.skript.lang.SkriptParser;
 import ch.njol.skript.lang.function.Functions;
 import ch.njol.skript.registrations.Classes;
+import ch.njol.skript.util.LiteralUtils;
 import ch.njol.skript.util.Utils;
+import ch.njol.util.Pair;
 import com.sovdee.oopsk.Oopsk;
 import com.sovdee.oopsk.core.Field;
 import com.sovdee.oopsk.core.Field.Modifier;
@@ -24,22 +27,26 @@ import com.sovdee.oopsk.events.DynamicFieldEvalEvent;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.skriptlang.skript.lang.converter.Converter;
+import org.skriptlang.skript.lang.converter.Converters;
 import org.skriptlang.skript.lang.entry.EntryContainer;
 import org.skriptlang.skript.lang.structure.Structure;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.sovdee.oopsk.core.generation.ReflectionUtils.addClassInfo;
-import static com.sovdee.oopsk.core.generation.ReflectionUtils.addLanguageNode;
 import static com.sovdee.oopsk.core.generation.ReflectionUtils.disableRegistrations;
 import static com.sovdee.oopsk.core.generation.ReflectionUtils.enableRegistrations;
+import static com.sovdee.oopsk.core.generation.ReflectionUtils.getQuickAccessConverters;
 import static com.sovdee.oopsk.core.generation.ReflectionUtils.removeClassInfo;
 import static com.sovdee.oopsk.core.generation.ReflectionUtils.removeLanguageNode;
 
@@ -52,7 +59,11 @@ import static com.sovdee.oopsk.core.generation.ReflectionUtils.removeLanguageNod
         "The default value will be evaluated when the struct is created.",
         "Fields can be marked as constant by adding 'const' or 'constant' at the beginning of the line. Constant fields cannot be changed after the struct is created.",
         "Dynamic fields can be made by adding 'dynamic' to the beginning of the line. Dynamic fields require a default value and will always re-evaluate their value each time they are called. " +
-        "This means they cannot be changed directly, but can rely on the values of other fields or even functions."
+        "This means they cannot be changed directly, but can rely on the values of other fields or even functions.",
+        "Converters can be defined in a 'converts to:' section. Each converter is defined in the format '<target type> via %expression%'. " +
+        "Note that oopsk cannot generate chained converters reliably, so you should expressly define converters for all target types you wish to convert to.",
+        "Be careful when using converters, as they can cause unexpected behavior in all of your scripts if not used properly." +
+        "Best practice is to ensure you reload all scripts after defining or modifying struct templates to ensure all converters are registered correctly."
 })
 @Example("""
     struct message:
@@ -60,12 +71,23 @@ import static com.sovdee.oopsk.core.generation.ReflectionUtils.removeLanguageNod
         message: string
         const timestamp: date = now
         attachments: objects
+        converts to:
+            string via this->message
     """)
 @Example("""
     struct Vector2:
         x: number
         y: number
         dynamic length: number = sqrt(this->x^2 + this->y^2)
+    """)
+@Example("""
+    struct CustomPlayer
+        const player: player
+        rank: string = "Member"
+        dynamic isAdmin: boolean = whether this->rank is "Admin"
+        converts to:
+            player via this->player
+            location via this->player's location
     """)
 @Since("1.0")
 public class StructStructTemplate extends Structure {
@@ -77,6 +99,7 @@ public class StructStructTemplate extends Structure {
     private StructTemplate template;
     private EntryContainer entryContainer;
     private String name;
+    private final Map<Class<?>, Converter<Struct, Object>> converters = new HashMap<>();
 
     @Override
     public boolean init(Literal<?>[] args, int matchedPattern, SkriptParser.ParseResult parseResult, @Nullable EntryContainer entryContainer) {
@@ -123,6 +146,94 @@ public class StructStructTemplate extends Structure {
         return templateManager.addTemplate(template);
     }
 
+    private void registerConverters(SectionNode node) {
+        // find
+        boolean found = false;
+        for (Node child : node) {
+            if (child instanceof SectionNode convertersNode) {
+                String key = ScriptLoader.replaceOptions(convertersNode.getKey());
+                if (key != null && key.trim().equalsIgnoreCase("converts to")) {
+                    if (found) {
+                        Skript.error("Multiple 'converts to' sections found in struct " + name + ".");
+                        return;
+                    }
+                    parseConverters(convertersNode);
+                    found = true;
+                    if (this.converters.isEmpty()) {
+                        Skript.error("No valid converters found in struct " + name + "'s 'converts to' section.");
+                        return;
+                    }
+                } else {
+                    Skript.error("Unexpected section '" + key + "' found in struct " + name + ".");
+                    return;
+                }
+            }
+        }
+
+        // register
+        if (found) {
+            enableRegistrations();
+            for (var entry : this.converters.entrySet()) {
+                Class<?> targetClass = entry.getKey();
+                Converter<Struct, Object> converter = entry.getValue();
+                //noinspection unchecked
+                Converters.registerConverter((Class<Struct>) customClass, (Class<Object>) targetClass, converter);
+            }
+            disableRegistrations();
+        }
+
+    }
+
+    private static final Pattern CONVERTER_PATTERN = Pattern.compile("([\\w ]+) via (.+)");
+
+    private void parseConverters(@NotNull SectionNode node) {
+        for (Node child : node) {
+            if (child instanceof SimpleNode simpleNode) {
+                String entry = simpleNode.getKey();
+                if (entry == null)
+                    throw new IllegalStateException("Null node found.");
+                // split into type and converter
+                Matcher matcher = CONVERTER_PATTERN.matcher(entry);
+                if (!matcher.matches()) {
+                    Skript.error("Invalid converter entry: " + entry);
+                    continue;
+                }
+                String typeString = matcher.group(1).trim();
+                String converterString = matcher.group(2).trim();
+
+                var pair = Utils.getEnglishPlural(typeString);
+                ClassInfo<?> targetType = Classes.getClassInfoFromUserInput(pair.getKey());
+                if (targetType == null) {
+                    Skript.error("Invalid converter target type: " + typeString);
+                    continue;
+                }
+
+                // parse the converter expression
+                var converter = new SkriptParser(converterString, SkriptParser.ALL_FLAGS, ParseContext.DEFAULT).parseExpression(targetType.getC());
+                if (converter == null || LiteralUtils.hasUnparsedLiteral(converter)) {
+                    Skript.error("Converter expression does not return the declared type of " +  Classes.toString(targetType) + ": '" + converterString + "'");
+                    continue;
+                }
+
+                // clear quick access converter to ensure there isn't a null entry
+                try {
+                    //noinspection removal,SuspiciousMethodCalls
+                    getQuickAccessConverters().remove(new Pair<>(customClass, targetType.getC()));
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+
+                // register the converter
+                converters.put(targetType.getC(), new Converter<>() {
+                    @Override
+                    public @Nullable Object convert(Struct from) {
+                        return converter.getSingle(new DynamicFieldEvalEvent(from));
+                    }
+                });
+            }
+        }
+    }
+
     public Class<? extends Struct> customClass;
     public ClassInfo<?> customClassInfo;
 
@@ -136,7 +247,7 @@ public class StructStructTemplate extends Structure {
         assert customClass != null;
 
         // hack open the Classes class to allow re-registration
-        addClassInfo(customClass, name);
+        customClassInfo = addClassInfo(customClass, name);
     }
 
     private void unregisterCustomType() {
@@ -150,7 +261,6 @@ public class StructStructTemplate extends Structure {
         }
     }
 
-
     @Override
     public boolean load() {
         var templateManager = Oopsk.getTemplateManager();
@@ -162,6 +272,8 @@ public class StructStructTemplate extends Structure {
             unregisterCustomType();
             return false;
         }
+        SectionNode node = entryContainer.getSource();
+        registerConverters(node);
         getParser().deleteCurrentEvent();
 
         return true;
