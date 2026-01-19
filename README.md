@@ -22,7 +22,7 @@ The expression may use `this` to refer to the struct being converted. Multiple c
 
 Creating a struct involves a simple expression:
 ```
-set {_a} to a message struct
+set {_a} to a message struct instance
 ```
 `{_a}` is now a new instance of the Message template, with contents and sender unset and timestamp set to the date the struct was created. Fields can be accessed and modified with the field access expression:
 ```
@@ -32,7 +32,7 @@ reset {_a}->timestamp
 ```
 Structs can also be created with initial values:
 ```
-set {_a} to a message struct:
+set {_a} to a message struct instance:
   sender: player
   contents: "hello world"
 ```
